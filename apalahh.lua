@@ -6,7 +6,7 @@ pcall(function()
   local st = os.clock() 
   local TweenService = game:GetService("TweenService") 
   cloneref = cloneref or function(o) return o end 
-  local GazeGoGui = cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui") or game.Players.LocalPlayer:WaitForChild("PlayerGui") 
+  local SanGoGui = cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui") or game.Players.LocalPlayer:WaitForChild("PlayerGui") 
   local Notifbro = {} 
   function Notify(titletxt, text, time) 
     coroutine.wrap(function() 
@@ -15,7 +15,7 @@ pcall(function()
       local title = Instance.new("TextLabel", Main) 
       local message = Instance.new("TextLabel", Main) 
       GUI.Name = "BackgroundNotif" 
-      GUI.Parent = GazeGoGui 
+      GUI.Parent = SanGoGui 
       local sw = workspace.CurrentCamera.ViewportSize.X 
       local sh = workspace.CurrentCamera.ViewportSize.Y 
       local nh = sh / 7 
@@ -72,14 +72,14 @@ pcall(function()
     end)() -- Invoke the coroutine immediately 
   end 
   task.wait(0.1) 
-  local guiName = "GazeVerificator" 
-  if GazeGoGui:FindFirstChild(guiName) then 
+  local guiName = "SanVerificator" 
+  if SanGoGui:FindFirstChild(guiName) then 
     Notify("Error","Script Already Executed", 1) 
     return 
   end 
   local screenGui = Instance.new("ScreenGui") 
   screenGui.Name = guiName 
-  screenGui.Parent = GazeGoGui 
+  screenGui.Parent = SanGoGui 
   local frame = Instance.new("Frame") 
   frame.Size = UDim2.new(0, 0, 0, 0) 
   frame.Visible = false 
@@ -99,7 +99,7 @@ pcall(function()
 
   -- Create the main menu frame (initially hidden)
   local mainFrame = Instance.new("Frame")
-  mainFrame.Name = "GazeBro"
+  mainFrame.Name = "SanBro"
   mainFrame.Size = getScaledSize(0.6, 0.4) -- Wider for two frames
   mainFrame.Position = UDim2.new(0.5, -mainFrame.Size.X.Offset / 2, 0.5, -mainFrame.Size.Y.Offset / 2) -- Centered
   mainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -115,17 +115,17 @@ pcall(function()
   mainCorner.Parent = mainFrame
 
   local labelSize = UDim2.new(1, 0, 0.1, 0) -- 10% of frame's height
-  -- Create GAZE text label
-  local gazeLabel = Instance.new("TextLabel")
-  gazeLabel.Name = "GazeLabel"
-  gazeLabel.Text = "GAZE"
-  gazeLabel.Font = Enum.Font.SourceSansBold
-  gazeLabel.TextScaled = true -- Scale text
-  gazeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-  gazeLabel.BackgroundTransparency = 1
-  gazeLabel.Size = labelSize
-  gazeLabel.Position = UDim2.new(0, 0, 0, 0)
-  gazeLabel.Parent = mainFrame
+  -- Create San text label
+  local SanLabel = Instance.new("TextLabel")
+  SanLabel.Name = "SanLabel"
+  SanLabel.Text = "San"
+  SanLabel.Font = Enum.Font.SourceSansBold
+  SanLabel.TextScaled = true -- Scale text
+  SanLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+  SanLabel.BackgroundTransparency = 1
+  SanLabel.Size = labelSize
+  SanLabel.Position = UDim2.new(0, 0, 0, 0)
+  SanLabel.Parent = mainFrame
 
   -- Create Search Bar (for available)
   local searchBar = Instance.new("TextBox")
@@ -214,8 +214,8 @@ pcall(function()
   -- Create round icon button (initially visible, draggable)
   local iconSize = getScaledSize(0.05, 0.05)  -- Small round icon
   local iconButton = Instance.new("TextButton")
-  iconButton.Name = "GazeIcon"
-  iconButton.Text = "GAZE"
+  iconButton.Name = "SanIcon"
+  iconButton.Text = "San"
   iconButton.Font = Enum.Font.SourceSansBold
   iconButton.TextScaled = true
   iconButton.TextColor3 = Color3.fromRGB(255, 255, 255)
