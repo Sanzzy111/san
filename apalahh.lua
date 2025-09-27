@@ -498,7 +498,7 @@ pcall(function()
     }, 
     Jump = { 
       Astronaut = "891627522", 
-      ["Adidas Community"] = "115715495289805", 
+      ["Adidas Community"] = "75290611992385", 
       Bold = "16738336650", 
       Bubbly = "910016857", 
       Cartoony = "742637942", 
