@@ -1,6 +1,6 @@
--- AVATAR CHANGER - AUTO REAPPLY ON RESPAWN + TOOL FIX
--- ✅ Auto apply avatar setelah respawn/mati
--- ✅ Item tidak hilang dan tetap berfungsi
+-- AVATAR CHANGER - FIXED TOOL PERSISTENCE
+-- ✅ Tools tidak hilang saat equip
+-- ✅ Auto reapply avatar setelah respawn
 -- ✅ Speedcoil, Gravity Coil work 100%
 
 local Players = game:GetService("Players")
@@ -15,7 +15,6 @@ local UIState = {
     isAnimating = false
 }
 
--- SIMPAN USERNAME TERAKHIR untuk auto-reapply
 local lastAppliedUsername = nil
 
 -- Toggle Button Creation (Draggable)
@@ -78,7 +77,7 @@ local function createUI()
     TitleText.Size = UDim2.new(1, -20, 1, 0)
     TitleText.Position = UDim2.new(0, 10, 0, 0)
     TitleText.BackgroundTransparency = 1
-    TitleText.Text = "🎮 AVATAR CHANGER (AUTO)"
+    TitleText.Text = "🎮 AVATAR CHANGER (FIXED)"
     TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleText.TextScaled = true
     TitleText.Font = Enum.Font.GothamBold
@@ -139,7 +138,7 @@ local function createUI()
     StatusText.Size = UDim2.new(1, -10, 1, 0)
     StatusText.Position = UDim2.new(0, 5, 0, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "✨ Ready (Auto-reapply ON)"
+    StatusText.Text = "✨ Ready (Tools Protected)"
     StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
     StatusText.TextScaled = true
     StatusText.Font = Enum.Font.GothamBold
@@ -149,7 +148,7 @@ local function createUI()
     return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton
 end
 
--- JANGAN SENTUH TOOLS SAMA SEKALI - Biarkan di backpack
+-- FUNGSI UTAMA: SIMPAN DAN RESTORE TOOLS
 local function loadAvatar(username)
     if not username or username == "" then
         return false, "Username tidak boleh kosong!"
@@ -176,7 +175,27 @@ local function loadAvatar(username)
         return false, "Gagal mendapatkan avatar"
     end
     
-    -- HANYA hapus accessories & clothing - JANGAN SENTUH TOOLS!
+    -- ===== KUNCI: SIMPAN SEMUA TOOLS SEBELUM APPLY =====
+    local savedTools = {}
+    local equippedTool = nil
+    
+    -- Simpan tools dari character (yang sedang equipped)
+    for _, item in pairs(lp.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            equippedTool = item
+            table.insert(savedTools, item:Clone())
+            item.Parent = nil -- Pindahkan sementara, jangan destroy
+        end
+    end
+    
+    -- Simpan tools dari backpack
+    for _, item in pairs(lp.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+        end
+    end
+    
+    -- Hapus accessories & clothing
     pcall(function()
         for _, accessory in pairs(lp.Character:GetChildren()) do
             if accessory:IsA("Accessory") then
@@ -193,16 +212,36 @@ local function loadAvatar(username)
     
     wait(0.1)
     
-    -- Apply avatar - Tools tetap aman di backpack
+    -- Apply avatar
     local success3 = pcall(function()
         lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
     end)
     
     if not success3 then
+        -- Restore tools jika gagal
+        for _, tool in pairs(savedTools) do
+            tool.Parent = lp.Backpack
+        end
         return false, "Gagal apply avatar"
     end
     
     wait(0.3)
+    
+    -- ===== RESTORE SEMUA TOOLS =====
+    for _, tool in pairs(savedTools) do
+        if tool and tool:IsA("Tool") then
+            tool.Parent = lp.Backpack
+        end
+    end
+    
+    -- Re-equip tool jika ada yang equipped sebelumnya
+    if equippedTool then
+        wait(0.1)
+        local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
+        if toolInBackpack then
+            lp.Character.Humanoid:EquipTool(toolInBackpack)
+        end
+    end
     
     return true, "Avatar changed: " .. username
 end
@@ -285,10 +324,8 @@ end
 -- Main Script
 local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton = createUI()
 
--- Make draggable
 makeDraggable(ToggleButton)
 
--- Toggle Button
 ToggleButton.MouseButton1Click:Connect(function()
     toggleUI(MainFrame, ToggleButton)
 end)
@@ -326,9 +363,9 @@ local function handleSubmit()
         local success, message = loadAvatar(username)
         
         if success then
-            lastAppliedUsername = username -- SIMPAN untuk auto-reapply
+            lastAppliedUsername = username
             UsernameInput.PlaceholderText = "✓ Active: " .. username
-            StatusText.Text = "✅ Auto-reapply: " .. username
+            StatusText.Text = "✅ Tools Protected: " .. username
             StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
             UsernameInput.PlaceholderText = "✗ Failed"
@@ -337,7 +374,7 @@ local function handleSubmit()
             
             wait(3)
             UsernameInput.PlaceholderText = "Enter username..."
-            StatusText.Text = "✨ Ready (Auto-reapply ON)"
+            StatusText.Text = "✨ Ready (Tools Protected)"
             StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
     end
@@ -351,7 +388,6 @@ UsernameInput.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- Hover for Submit
 SubmitButton.MouseEnter:Connect(function()
     SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
 end)
@@ -360,14 +396,12 @@ SubmitButton.MouseLeave:Connect(function()
     SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 end)
 
--- AUTO REAPPLY ON RESPAWN/DEATH
+-- AUTO REAPPLY ON RESPAWN
 lp.CharacterAdded:Connect(function(char)
     if lastAppliedUsername then
-        -- Tunggu character fully loaded
         char:WaitForChild("Humanoid")
         wait(1)
         
-        -- Auto reapply avatar terakhir
         StatusText.Text = "🔄 Auto-reapplying: " .. lastAppliedUsername
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
@@ -391,9 +425,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("=== AVATAR CHANGER - AUTO REAPPLY ===")
-print("✅ Auto reapply avatar setelah respawn/mati")
-print("✅ Tools TIDAK disentuh sama sekali")
+print("=== AVATAR CHANGER - TOOL PERSISTENCE FIXED ===")
+print("✅ Tools tidak hilang saat equip")
+print("✅ Auto re-equip tool setelah change avatar")
 print("✅ Speedcoil & Gravity Coil work 100%")
 print("✅ Tekan F1 untuk toggle UI")
-print("=======================================")
+print("===============================================")
