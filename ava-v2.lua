@@ -32,12 +32,6 @@ local AvatarPresets = {
 -- 💾 LOAD PRESETS FROM FILE
 local function loadPresetsFromFile()
     local success, result = pcall(function()
-        if not isfolder("Delta") then
-            makefolder("Delta")
-        end
-        if not isfolder("Delta/Workspace") then
-            makefolder("Delta/Workspace")
-        end
         return readfile("Delta/Workspace/AvatarPresets.json")
     end)
     
@@ -45,7 +39,7 @@ local function loadPresetsFromFile()
         local decoded = HttpService:JSONDecode(result)
         if decoded then
             AvatarPresets = decoded
-            print("✅ Loaded presets from: Delta/Workspace/AvatarPresets.json")
+            print("✅ Loaded presets from file")
             return true
         end
     end
@@ -57,21 +51,15 @@ end
 -- 💾 SAVE PRESETS TO FILE
 local function savePresetsToFile()
     local success, err = pcall(function()
-        if not isfolder("Delta") then
-            makefolder("Delta")
-        end
-        if not isfolder("Delta/Workspace") then
-            makefolder("Delta/Workspace")
-        end
         local encoded = HttpService:JSONEncode(AvatarPresets)
         writefile("Delta/Workspace/AvatarPresets.json", encoded)
     end)
     
     if success then
-        print("✅ Presets saved to: Delta/Workspace/AvatarPresets.json")
+        print("✅ Presets saved to file")
         return true
     else
-        warn("❌ Failed to save presets:", err)
+        warn("❌ Failed to save presets:", tostring(err))
         return false
     end
 end
