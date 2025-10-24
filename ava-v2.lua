@@ -1,17 +1,13 @@
--- AVATAR CHANGER - FILE PRESET SYSTEM (DELTA EXECUTOR)
+-- AVATAR CHANGER - PRESET SYSTEM
+-- ✅ 5 Preset Avatar yang tersimpan ke file
+-- ✅ Auto load preset setelah rejoin/ganti map
 -- ✅ Tools tidak hilang saat equip
--- ✅ Auto reapply avatar setelah respawn
--- ✅ Speedcoil, Gravity Coil work 100%
--- 🆕 Preset tersimpan di file (tetap ada setelah rejoin/ganti map)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local lp = Players.LocalPlayer
-
--- KONFIGURASI FILE
-local PRESET_FILE = "avatar_presets.txt" -- Nama file untuk menyimpan preset
 
 -- State Management
 local UIState = {
@@ -20,71 +16,46 @@ local UIState = {
 }
 
 local lastAppliedUsername = nil
+local presets = {}
+local PRESET_FILE = "avatar_presets.json"
 
--- 🆕 PRESET STORAGE (5 SLOTS) - Akan diload dari file
-local AvatarPresets = {
-    slot1 = nil,
-    slot2 = nil,
-    slot3 = nil,
-    slot4 = nil,
-    slot5 = nil
-}
-
--- ===== FILE SYSTEM FUNCTIONS =====
-
--- Fungsi untuk menyimpan preset ke file
-local function savePresetsToFile()
-    local success, err = pcall(function()
-        local data = ""
-        for i = 1, 5 do
-            local slotName = "slot" .. i
-            local username = AvatarPresets[slotName] or ""
-            data = data .. username .. "\n"
+-- Load presets dari file
+local function loadPresets()
+    if not readfile or not isfile then 
+        warn("Executor tidak support file operations")
+        return 
+    end
+    
+    if isfile(PRESET_FILE) then
+        local success, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(readfile(PRESET_FILE))
+        end)
+        
+        if success and data then
+            presets = data
+            print("✅ Loaded " .. #presets .. " presets dari file")
         end
-        writefile(PRESET_FILE, data)
+    end
+end
+
+-- Save presets ke file
+local function savePresets()
+    if not writefile then 
+        warn("Executor tidak support file writing")
+        return 
+    end
+    
+    local success = pcall(function()
+        local json = game:GetService("HttpService"):JSONEncode(presets)
+        writefile(PRESET_FILE, json)
     end)
     
     if success then
-        return true, "Preset saved to file"
-    else
-        return false, "Failed to save: " .. tostring(err)
+        print("✅ Presets saved to file")
     end
 end
 
--- Fungsi untuk load preset dari file
-local function loadPresetsFromFile()
-    local success, result = pcall(function()
-        if not isfile(PRESET_FILE) then
-            return false
-        end
-        
-        local data = readfile(PRESET_FILE)
-        local lines = {}
-        for line in data:gmatch("[^\r\n]+") do
-            table.insert(lines, line)
-        end
-        
-        for i = 1, 5 do
-            local slotName = "slot" .. i
-            local username = lines[i]
-            if username and username ~= "" and username ~= "nil" then
-                AvatarPresets[slotName] = username
-            else
-                AvatarPresets[slotName] = nil
-            end
-        end
-        
-        return true
-    end)
-    
-    if success and result then
-        return true, "Presets loaded from file"
-    else
-        return false, "No saved presets found"
-    end
-end
-
--- Toggle Button Creation (Draggable)
+-- Toggle Button Creation
 local function createToggleButton()
     local ToggleButton = Instance.new("TextButton")
     ToggleButton.Name = "ToggleButton"
@@ -105,69 +76,7 @@ local function createToggleButton()
     return ToggleButton
 end
 
--- 🆕 PRESET BUTTONS CREATION
-local function createPresetButtons(parent)
-    local PresetFrame = Instance.new("Frame")
-    PresetFrame.Name = "PresetFrame"
-    PresetFrame.Size = UDim2.new(1, -20, 0, 70)
-    PresetFrame.Position = UDim2.new(0, 10, 0, 120)
-    PresetFrame.BackgroundTransparency = 1
-    PresetFrame.Parent = parent
-    
-    local PresetTitle = Instance.new("TextLabel")
-    PresetTitle.Size = UDim2.new(1, 0, 0, 20)
-    PresetTitle.BackgroundTransparency = 1
-    PresetTitle.Text = "💾 AVATAR PRESETS (FILE SAVED)"
-    PresetTitle.TextColor3 = Color3.fromRGB(255, 200, 0)
-    PresetTitle.TextScaled = true
-    PresetTitle.Font = Enum.Font.GothamBold
-    PresetTitle.Parent = PresetFrame
-    
-    local ButtonsContainer = Instance.new("Frame")
-    ButtonsContainer.Size = UDim2.new(1, 0, 0, 45)
-    ButtonsContainer.Position = UDim2.new(0, 0, 0, 25)
-    ButtonsContainer.BackgroundTransparency = 1
-    ButtonsContainer.Parent = PresetFrame
-    
-    local presetButtons = {}
-    
-    for i = 1, 5 do
-        local slotName = "slot" .. i
-        
-        local SlotButton = Instance.new("TextButton")
-        SlotButton.Name = "PresetSlot" .. i
-        SlotButton.Size = UDim2.new(0.18, 0, 1, 0)
-        SlotButton.Position = UDim2.new((i-1) * 0.2 + 0.01, 0, 0, 0)
-        SlotButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        SlotButton.BorderSizePixel = 0
-        SlotButton.Text = "SLOT " .. i
-        SlotButton.TextColor3 = Color3.fromRGB(150, 150, 150)
-        SlotButton.TextScaled = true
-        SlotButton.Font = Enum.Font.GothamBold
-        SlotButton.Parent = ButtonsContainer
-        
-        local SlotCorner = Instance.new("UICorner")
-        SlotCorner.CornerRadius = UDim.new(0, 8)
-        SlotCorner.Parent = SlotButton
-        
-        local SlotLabel = Instance.new("TextLabel")
-        SlotLabel.Name = "SlotLabel"
-        SlotLabel.Size = UDim2.new(1, 0, 0.4, 0)
-        SlotLabel.Position = UDim2.new(0, 0, 0.6, 0)
-        SlotLabel.BackgroundTransparency = 1
-        SlotLabel.Text = "Empty"
-        SlotLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
-        SlotLabel.TextScaled = true
-        SlotLabel.Font = Enum.Font.Gotham
-        SlotLabel.Parent = SlotButton
-        
-        presetButtons[slotName] = {button = SlotButton, label = SlotLabel}
-    end
-    
-    return presetButtons
-end
-
--- UI Creation
+-- UI Creation dengan Preset Buttons
 local function createUI()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "RobloxAccountLoader"
@@ -180,7 +89,7 @@ local function createUI()
     
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 380, 0, 195)
+    MainFrame.Size = UDim2.new(0, 380, 0, 240)
     MainFrame.Position = UDim2.new(0.5, -190, 0.05, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     MainFrame.BorderSizePixel = 0
@@ -206,7 +115,7 @@ local function createUI()
     TitleText.Size = UDim2.new(1, -20, 1, 0)
     TitleText.Position = UDim2.new(0, 10, 0, 0)
     TitleText.BackgroundTransparency = 1
-    TitleText.Text = "🎮 AVATAR CHANGER (FILE)"
+    TitleText.Text = "🎮 AVATAR CHANGER (PRESET)"
     TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleText.TextScaled = true
     TitleText.Font = Enum.Font.GothamBold
@@ -221,7 +130,7 @@ local function createUI()
     
     local UsernameInput = Instance.new("TextBox")
     UsernameInput.Name = "UsernameInput"
-    UsernameInput.Size = UDim2.new(0.5, -5, 1, 0)
+    UsernameInput.Size = UDim2.new(0.7, -5, 1, 0)
     UsernameInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     UsernameInput.BorderSizePixel = 0
     UsernameInput.Text = ""
@@ -237,11 +146,11 @@ local function createUI()
     
     local SubmitButton = Instance.new("TextButton")
     SubmitButton.Name = "SubmitButton"
-    SubmitButton.Size = UDim2.new(0.25, -5, 1, 0)
-    SubmitButton.Position = UDim2.new(0.5, 0, 0, 0)
+    SubmitButton.Size = UDim2.new(0.3, -5, 1, 0)
+    SubmitButton.Position = UDim2.new(0.7, 0, 0, 0)
     SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
     SubmitButton.BorderSizePixel = 0
-    SubmitButton.Text = "APPLY"
+    SubmitButton.Text = "SUBMIT"
     SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     SubmitButton.TextScaled = true
     SubmitButton.Font = Enum.Font.GothamBold
@@ -251,25 +160,63 @@ local function createUI()
     SubmitCorner.CornerRadius = UDim.new(0, 8)
     SubmitCorner.Parent = SubmitButton
     
-    local SaveButton = Instance.new("TextButton")
-    SaveButton.Name = "SaveButton"
-    SaveButton.Size = UDim2.new(0.25, -5, 1, 0)
-    SaveButton.Position = UDim2.new(0.75, 0, 0, 0)
-    SaveButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    SaveButton.BorderSizePixel = 0
-    SaveButton.Text = "SAVE"
-    SaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SaveButton.TextScaled = true
-    SaveButton.Font = Enum.Font.GothamBold
-    SaveButton.Parent = InputFrame
+    -- PRESET SECTION
+    local PresetFrame = Instance.new("Frame")
+    PresetFrame.Size = UDim2.new(1, -20, 0, 120)
+    PresetFrame.Position = UDim2.new(0, 10, 0, 75)
+    PresetFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    PresetFrame.BorderSizePixel = 0
+    PresetFrame.Parent = MainFrame
     
-    local SaveCorner = Instance.new("UICorner")
-    SaveCorner.CornerRadius = UDim.new(0, 8)
-    SaveCorner.Parent = SaveButton
+    local PresetCorner = Instance.new("UICorner")
+    PresetCorner.CornerRadius = UDim.new(0, 8)
+    PresetCorner.Parent = PresetFrame
+    
+    local PresetTitle = Instance.new("TextLabel")
+    PresetTitle.Size = UDim2.new(1, 0, 0, 20)
+    PresetTitle.BackgroundTransparency = 1
+    PresetTitle.Text = "⭐ PRESETS (Right-Click to Save)"
+    PresetTitle.TextColor3 = Color3.fromRGB(255, 200, 0)
+    PresetTitle.TextScaled = true
+    PresetTitle.Font = Enum.Font.GothamBold
+    PresetTitle.Parent = PresetFrame
+    
+    -- 5 Preset Buttons
+    local presetButtons = {}
+    for i = 1, 5 do
+        local btn = Instance.new("TextButton")
+        btn.Name = "Preset" .. i
+        btn.Size = UDim2.new(0.18, 0, 0, 35)
+        btn.Position = UDim2.new((i-1) * 0.2 + 0.01, 0, 0, 25)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        btn.BorderSizePixel = 0
+        btn.Text = tostring(i)
+        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        btn.TextScaled = true
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = PresetFrame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Size = UDim2.new(1, 0, 0, 15)
+        label.Position = UDim2.new(0, 0, 1, 2)
+        label.BackgroundTransparency = 1
+        label.Text = "Empty"
+        label.TextColor3 = Color3.fromRGB(150, 150, 150)
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        label.Parent = btn
+        
+        presetButtons[i] = btn
+    end
     
     local StatusFrame = Instance.new("Frame")
     StatusFrame.Size = UDim2.new(1, -20, 0, 40)
-    StatusFrame.Position = UDim2.new(0, 10, 0, 75)
+    StatusFrame.Position = UDim2.new(0, 10, 0, 200)
     StatusFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     StatusFrame.BorderSizePixel = 0
     StatusFrame.Parent = MainFrame
@@ -290,12 +237,10 @@ local function createUI()
     StatusText.TextXAlignment = Enum.TextXAlignment.Center
     StatusText.Parent = StatusFrame
     
-    local PresetButtons = createPresetButtons(MainFrame)
-    
-    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, SaveButton, PresetButtons
+    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons
 end
 
--- FUNGSI UTAMA: SIMPAN DAN RESTORE TOOLS
+-- Load Avatar Function
 local function loadAvatar(username)
     if not username or username == "" then
         return false, "Username tidak boleh kosong!"
@@ -322,7 +267,7 @@ local function loadAvatar(username)
         return false, "Gagal mendapatkan avatar"
     end
     
-    -- ===== KUNCI: SIMPAN SEMUA TOOLS SEBELUM APPLY =====
+    -- Simpan tools
     local savedTools = {}
     local equippedTool = nil
     
@@ -340,6 +285,7 @@ local function loadAvatar(username)
         end
     end
     
+    -- Hapus accessories & clothing
     pcall(function()
         for _, accessory in pairs(lp.Character:GetChildren()) do
             if accessory:IsA("Accessory") then
@@ -356,6 +302,7 @@ local function loadAvatar(username)
     
     wait(0.1)
     
+    -- Apply avatar
     local success3 = pcall(function()
         lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
     end)
@@ -369,7 +316,7 @@ local function loadAvatar(username)
     
     wait(0.3)
     
-    -- ===== RESTORE SEMUA TOOLS =====
+    -- Restore tools
     for _, tool in pairs(savedTools) do
         if tool and tool:IsA("Tool") then
             tool.Parent = lp.Backpack
@@ -387,23 +334,20 @@ local function loadAvatar(username)
     return true, "Avatar changed: " .. username
 end
 
--- 🆕 UPDATE PRESET BUTTON DISPLAY
-local function updatePresetDisplay(presetButtons)
+-- Update Preset UI
+local function updatePresetUI(presetButtons)
     for i = 1, 5 do
-        local slotName = "slot" .. i
-        local button = presetButtons[slotName].button
-        local label = presetButtons[slotName].label
+        local btn = presetButtons[i]
+        local label = btn:FindFirstChild("Label")
         
-        if AvatarPresets[slotName] then
-            label.Text = AvatarPresets[slotName]
-            label.TextColor3 = Color3.fromRGB(0, 255, 100)
-            button.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
-            button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        if presets[i] then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+            label.Text = presets[i]
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
         else
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
             label.Text = "Empty"
-            label.TextColor3 = Color3.fromRGB(100, 100, 100)
-            button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            button.TextColor3 = Color3.fromRGB(150, 150, 150)
+            label.TextColor3 = Color3.fromRGB(150, 150, 150)
         end
     end
 end
@@ -415,7 +359,7 @@ local function animateUI(frame, isOpening)
     
     local targetSize, targetVisible
     if isOpening then
-        targetSize = UDim2.new(0, 380, 0, 195)
+        targetSize = UDim2.new(0, 380, 0, 240)
         targetVisible = true
         frame.Visible = true
     else
@@ -455,7 +399,6 @@ local function toggleUI(mainFrame, toggleButton)
     end
 end
 
--- Drag Function
 local function makeDraggable(frame)
     local dragging = false
     local dragStart = nil
@@ -484,21 +427,9 @@ local function makeDraggable(frame)
 end
 
 -- Main Script
-local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, SaveButton, PresetButtons = createUI()
+loadPresets()
 
--- 🆕 LOAD PRESETS DARI FILE SAAT START
-local loadSuccess, loadMsg = loadPresetsFromFile()
-if loadSuccess then
-    updatePresetDisplay(PresetButtons)
-    print("✅ " .. loadMsg)
-    StatusText.Text = "📁 Presets loaded from file"
-    StatusText.TextColor3 = Color3.fromRGB(0, 255, 255)
-    wait(2)
-    StatusText.Text = "✨ Ready (Tools Protected)"
-    StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-else
-    print("ℹ️ " .. loadMsg)
-end
+local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons = createUI()
 
 makeDraggable(ToggleButton)
 
@@ -572,125 +503,90 @@ SubmitButton.MouseLeave:Connect(function()
     SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 end)
 
--- 🆕 SAVE BUTTON LOGIC (WITH FILE SAVE)
-local selectedSlot = nil
-
-SaveButton.MouseButton1Click:Connect(function()
-    if not lastAppliedUsername then
-        StatusText.Text = "⚠️ Apply avatar dulu sebelum save!"
-        StatusText.TextColor3 = Color3.fromRGB(255, 150, 0)
-        wait(2)
-        StatusText.Text = "✨ Ready (Tools Protected)"
-        StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-        return
-    end
-    
-    if not selectedSlot then
-        StatusText.Text = "⚠️ Pilih slot preset dulu (klik salah satu slot)!"
-        StatusText.TextColor3 = Color3.fromRGB(255, 150, 0)
-        wait(3)
-        StatusText.Text = "✨ Ready (Tools Protected)"
-        StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-        return
-    end
-    
-    AvatarPresets[selectedSlot] = lastAppliedUsername
-    
-    -- 🆕 SAVE TO FILE
-    local saveSuccess, saveMsg = savePresetsToFile()
-    
-    updatePresetDisplay(PresetButtons)
-    
-    if saveSuccess then
-        StatusText.Text = "💾 Saved to FILE - " .. selectedSlot:upper() .. ": " .. lastAppliedUsername
-        StatusText.TextColor3 = Color3.fromRGB(0, 200, 255)
-    else
-        StatusText.Text = "⚠️ Saved to memory only: " .. saveMsg
-        StatusText.TextColor3 = Color3.fromRGB(255, 150, 0)
-    end
-    
-    wait(2)
-    StatusText.Text = "✅ Tools Protected: " .. lastAppliedUsername
-    StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-    
-    selectedSlot = nil
-end)
-
-SaveButton.MouseEnter:Connect(function()
-    SaveButton.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
-end)
-
-SaveButton.MouseLeave:Connect(function()
-    SaveButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-end)
-
--- 🆕 PRESET BUTTONS LOGIC
-for i = 1, 5 do
-    local slotName = "slot" .. i
-    local button = PresetButtons[slotName].button
-    
-    button.MouseButton1Click:Connect(function()
-        if AvatarPresets[slotName] then
-            -- Load preset avatar
-            StatusText.Text = "⏳ Loading preset..."
+-- Preset Buttons Logic
+for i, btn in ipairs(presetButtons) do
+    -- Left Click: Load preset
+    btn.MouseButton1Click:Connect(function()
+        if presets[i] then
+            StatusText.Text = "⏳ Loading Preset " .. i .. "..."
             StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
             
-            local success, message = loadAvatar(AvatarPresets[slotName])
+            local success, message = loadAvatar(presets[i])
             
             if success then
-                lastAppliedUsername = AvatarPresets[slotName]
-                UsernameInput.PlaceholderText = "✓ Preset: " .. AvatarPresets[slotName]
-                StatusText.Text = "✅ Loaded: " .. AvatarPresets[slotName]
+                lastAppliedUsername = presets[i]
+                StatusText.Text = "✅ Preset " .. i .. " loaded!"
                 StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
             else
-                StatusText.Text = "❌ " .. message
+                StatusText.Text = "❌ Preset failed: " .. message
                 StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
             end
         else
-            -- Select slot for saving
-            selectedSlot = slotName
-            StatusText.Text = "📌 Selected " .. slotName:upper() .. " for saving"
-            StatusText.TextColor3 = Color3.fromRGB(255, 200, 0)
-            
-            -- Visual feedback
-            for j = 1, 5 do
-                local otherSlot = "slot" .. j
-                if AvatarPresets[otherSlot] then
-                    PresetButtons[otherSlot].button.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
-                else
-                    PresetButtons[otherSlot].button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                end
-            end
-            button.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+            StatusText.Text = "⚠️ Preset " .. i .. " is empty!"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
         end
     end)
     
-    -- Long press to delete preset
-    local pressTime = 0
-    button.MouseButton1Down:Connect(function()
-        pressTime = tick()
-    end)
-    
-    button.MouseButton1Up:Connect(function()
-        if tick() - pressTime >= 1.5 and AvatarPresets[slotName] then
-            AvatarPresets[slotName] = nil
+    -- Right Click: Save current avatar
+    btn.MouseButton2Click:Connect(function()
+        if lastAppliedUsername then
+            presets[i] = lastAppliedUsername
+            savePresets()
+            updatePresetUI(presetButtons)
             
-            -- 🆕 UPDATE FILE AFTER DELETE
-            savePresetsToFile()
-            
-            updatePresetDisplay(PresetButtons)
-            StatusText.Text = "🗑️ Deleted " .. slotName:upper() .. " from file"
-            StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
-            wait(2)
-            StatusText.Text = "✨ Ready (Tools Protected)"
-            StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-        end
-    end)
-    
-    button.MouseEnter:Connect(function()
-        if AvatarPresets[slotName] then
-            button.BackgroundColor3 = Color3.fromRGB(0, 150, 70)
+            StatusText.Text = "💾 Saved to Preset " .. i .. "!"
+            StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
-            button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            StatusText.Text = "⚠️ Apply avatar first!"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
         end
     end)
+    
+    -- Hover effect
+    btn.MouseEnter:Connect(function()
+        btn.Size = UDim2.new(0.19, 0, 0, 38)
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        btn.Size = UDim2.new(0.18, 0, 0, 35)
+    end)
+end
+
+updatePresetUI(presetButtons)
+
+-- AUTO REAPPLY ON RESPAWN
+lp.CharacterAdded:Connect(function(char)
+    if lastAppliedUsername then
+        char:WaitForChild("Humanoid")
+        wait(1)
+        
+        StatusText.Text = "🔄 Auto-reapplying: " .. lastAppliedUsername
+        StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
+        
+        local success, message = loadAvatar(lastAppliedUsername)
+        
+        if success then
+            StatusText.Text = "✅ Auto-applied: " .. lastAppliedUsername
+            StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
+        else
+            StatusText.Text = "❌ Auto-apply failed"
+            StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
+        end
+    end
+end)
+
+-- Keyboard Shortcut (F1)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F1 then
+        toggleUI(MainFrame, ToggleButton)
+    end
+end)
+
+print("=== AVATAR CHANGER - PRESET SYSTEM ===")
+print("✅ 5 Preset Avatar tersimpan ke file")
+print("✅ Left Click = Load Preset")
+print("✅ Right Click = Save Current Avatar")
+print("✅ Auto load setelah rejoin/respawn")
+print("✅ Tekan F1 untuk toggle UI")
+print("======================================")
