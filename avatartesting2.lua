@@ -59,38 +59,26 @@ end
 
 -- Convert HumanoidDescription to table
 local function descriptionToTable(desc)
-    return {
-        Face = desc.Face,
-        Head = desc.Head,
-        LeftArm = desc.LeftArm,
-        LeftLeg = desc.LeftLeg,
-        RightArm = desc.RightArm,
-        RightLeg = desc.RightLeg,
-        Torso = desc.Torso,
-        BodyTypeScale = desc.BodyTypeScale,
-        DepthScale = desc.DepthScale,
-        HeadScale = desc.HeadScale,
-        HeightScale = desc.HeightScale,
-        ProportionScale = desc.ProportionScale,
-        WidthScale = desc.WidthScale,
-        HeadColor = desc.HeadColor,
-        LeftArmColor = desc.LeftArmColor,
-        LeftLegColor = desc.LeftLegColor,
-        RightArmColor = desc.RightArmColor,
-        RightLegColor = desc.RightLegColor,
-        TorsoColor = desc.TorsoColor,
-        Shirt = desc.Shirt,
-        Pants = desc.Pants,
-        GraphicTShirt = desc.GraphicTShirt,
-        HatAccessory = desc.HatAccessory,
-        HairAccessory = desc.HairAccessory,
-        FaceAccessory = desc.FaceAccessory,
-        NeckAccessory = desc.NeckAccessory,
-        ShoulderAccessory = desc.ShoulderAccessory,
-        FrontAccessory = desc.FrontAccessory,
-        BackAccessory = desc.BackAccessory,
-        WaistAccessory = desc.WaistAccessory
+    local tbl = {}
+    
+    -- List semua properti yang mungkin ada
+    local properties = {
+        "Face", "Head", "LeftArm", "LeftLeg", "RightArm", "RightLeg", "Torso",
+        "BodyTypeScale", "DepthScale", "HeadScale", "HeightScale", "ProportionScale", "WidthScale",
+        "HeadColor", "LeftArmColor", "LeftLegColor", "RightArmColor", "RightLegColor", "TorsoColor",
+        "Shirt", "Pants", "GraphicTShirt",
+        "HatAccessory", "HairAccessory", "FaceAccessory", "NeckAccessory", 
+        "ShoulderAccessory", "FrontAccessory", "BackAccessory", "WaistAccessory"
     }
+    
+    -- Ambil setiap properti dengan pcall untuk handle properti yang tidak ada
+    for _, prop in ipairs(properties) do
+        pcall(function()
+            tbl[prop] = desc[prop]
+        end)
+    end
+    
+    return tbl
 end
 
 -- Convert table to HumanoidDescription
