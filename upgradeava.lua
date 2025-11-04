@@ -28,13 +28,13 @@ local function serializeHumanoidDescription(desc)
     
     local data = {
         username = "", -- Akan diisi saat save
-        -- Appearance
-        HeadColor = desc.HeadColor3,
-        TorsoColor = desc.TorsoColor3,
-        LeftArmColor = desc.LeftArmColor3,
-        RightArmColor = desc.RightArmColor3,
-        LeftLegColor = desc.LeftLegColor3,
-        RightLegColor = desc.RightLegColor3,
+        -- Appearance (Color3 values)
+        HeadColor = {desc.HeadColor.R, desc.HeadColor.G, desc.HeadColor.B},
+        TorsoColor = {desc.TorsoColor.R, desc.TorsoColor.G, desc.TorsoColor.B},
+        LeftArmColor = {desc.LeftArmColor.R, desc.LeftArmColor.G, desc.LeftArmColor.B},
+        RightArmColor = {desc.RightArmColor.R, desc.RightArmColor.G, desc.RightArmColor.B},
+        LeftLegColor = {desc.LeftLegColor.R, desc.LeftLegColor.G, desc.LeftLegColor.B},
+        RightLegColor = {desc.RightLegColor.R, desc.RightLegColor.G, desc.RightLegColor.B},
         
         -- Scales
         DepthScale = desc.DepthScale,
@@ -91,13 +91,13 @@ local function deserializeHumanoidDescription(data)
     
     local desc = Instance.new("HumanoidDescription")
     
-    -- Appearance
-    pcall(function() desc.HeadColor3 = data.HeadColor end)
-    pcall(function() desc.TorsoColor3 = data.TorsoColor end)
-    pcall(function() desc.LeftArmColor3 = data.LeftArmColor end)
-    pcall(function() desc.RightArmColor3 = data.RightArmColor end)
-    pcall(function() desc.LeftLegColor3 = data.LeftLegColor end)
-    pcall(function() desc.RightLegColor3 = data.RightLegColor end)
+    -- Appearance (restore Color3 from array)
+    pcall(function() desc.HeadColor = Color3.new(data.HeadColor[1], data.HeadColor[2], data.HeadColor[3]) end)
+    pcall(function() desc.TorsoColor = Color3.new(data.TorsoColor[1], data.TorsoColor[2], data.TorsoColor[3]) end)
+    pcall(function() desc.LeftArmColor = Color3.new(data.LeftArmColor[1], data.LeftArmColor[2], data.LeftArmColor[3]) end)
+    pcall(function() desc.RightArmColor = Color3.new(data.RightArmColor[1], data.RightArmColor[2], data.RightArmColor[3]) end)
+    pcall(function() desc.LeftLegColor = Color3.new(data.LeftLegColor[1], data.LeftLegColor[2], data.LeftLegColor[3]) end)
+    pcall(function() desc.RightLegColor = Color3.new(data.RightLegColor[1], data.RightLegColor[2], data.RightLegColor[3]) end)
     
     -- Scales
     pcall(function() desc.DepthScale = data.DepthScale end)
