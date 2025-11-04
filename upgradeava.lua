@@ -25,15 +25,29 @@ local lastAppliedPresetIndex = nil
 local presets = {}
 local PRESET_FILE = "avatar_presets.json"
 
--- ADD: HumanoidDescription <-> table helpers
+-- ADD: HumanoidDescription <-> table helpers (FIXED for client)
+local HttpService = game:GetService("HttpService")
+
+-- Daftar properti utama dari HumanoidDescription (manual, karena Enum.HumanoidDescriptionProperty tidak ada di client)
+local humanoidProperties = {
+    "BackAccessory", "BodyTypeScale", "ClimbAnimation", "DepthScale",
+    "Face", "FaceAccessory", "FallAnimation", "FrontAccessory",
+    "GraphicTShirt", "HairAccessory", "HatAccessory", "Head",
+    "HeadColor", "HeightScale", "IdleAnimation", "JumpAnimation",
+    "LeftArm", "LeftArmColor", "LeftLeg", "LeftLegColor", "NeckAccessory",
+    "NumberEmotesLoaded", "Pants", "ProportionScale", "RightArm",
+    "RightArmColor", "RightLeg", "RightLegColor", "RunAnimation",
+    "Shirt", "ShouldersAccessory", "SwimAnimation", "Torso", "TorsoColor",
+    "WaistAccessory", "WalkAnimation", "WidthScale",
+    "EmoteAnimation", "GraphicTShirtAccessory"
+}
+
 local function descriptionToTable(desc)
     local data = {}
-    for _, prop in ipairs(Enum.HumanoidDescriptionProperty:GetEnumItems()) do
-        local ok, val = pcall(function() return desc[prop.Name] end)
+    for _, propName in ipairs(humanoidProperties) do
+        local ok, val = pcall(function() return desc[propName] end)
         if ok then
-            data[prop.Name] = val
-        else
-            data[prop.Name] = nil
+            data[propName] = val
         end
     end
     return data
@@ -41,10 +55,11 @@ end
 
 local function tableToDescription(data)
     local desc = Instance.new("HumanoidDescription")
-    for k, v in pairs(data or {}) do
-        -- only set if property exists
-        if desc[k] ~= nil then
-            desc[k] = v
+    for _, propName in ipairs(humanoidProperties) do
+        if data[propName] ~= nil then
+            pcall(function()
+                desc[propName] = data[propName]
+            end)
         end
     end
     return desc
