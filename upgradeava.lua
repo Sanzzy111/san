@@ -42,27 +42,26 @@ local humanoidProperties = {
     "EmoteAnimation", "GraphicTShirtAccessory"
 }
 
+-- ADVANCED: Snapshot HumanoidDescription 1:1 (seperti GetHumanoidDescriptionFromUserId)
 local function descriptionToTable(desc)
-    local data = {}
-    for _, propName in ipairs(humanoidProperties) do
-        local ok, val = pcall(function() return desc[propName] end)
-        if ok then
-            data[propName] = val
-        end
-    end
-    return data
+	local data = {}
+	for _, prop in ipairs(getproperties(desc)) do
+		local ok, val = pcall(function() return desc[prop] end)
+		if ok then
+			data[prop] = val
+		end
+	end
+	return data
 end
 
 local function tableToDescription(data)
-    local desc = Instance.new("HumanoidDescription")
-    for _, propName in ipairs(humanoidProperties) do
-        if data[propName] ~= nil then
-            pcall(function()
-                desc[propName] = data[propName]
-            end)
-        end
-    end
-    return desc
+	local desc = Instance.new("HumanoidDescription")
+	for prop, val in pairs(data or {}) do
+		local ok = pcall(function()
+			desc[prop] = val
+		end)
+	end
+	return desc
 end
 
 -- Load presets dari file
