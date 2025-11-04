@@ -1,5 +1,6 @@
--- AVATAR CHANGER - FULL PRESET SYSTEM
--- ✅ Menyimpan SELURUH data avatar (accessories, clothing, body colors, dll)
+-- AVATAR CHANGER - COMPLETE FULL PRESET SYSTEM
+-- ✅ Menyimpan SELURUH data avatar termasuk SEMUA accessories
+-- ✅ Support multiple accessories per slot
 -- ✅ 5 Preset Avatar tersimpan ke file
 -- ✅ Auto load preset setelah rejoin/ganti map
 -- ✅ Tools tidak hilang saat equip
@@ -18,7 +19,7 @@ local UIState = {
 
 local currentAvatarData = nil
 local presets = {}
-local PRESET_FILE = "avatar_full_presets.json"
+local PRESET_FILE = "avatar_complete_presets.json"
 
 -- Function untuk safely get property
 local function safeGetProperty(obj, propName, default)
@@ -28,12 +29,17 @@ local function safeGetProperty(obj, propName, default)
     return success and value or default
 end
 
--- Function untuk serialize HumanoidDescription
+-- Function untuk serialize HumanoidDescription LENGKAP
 local function serializeHumanoidDescription(desc)
     if not desc then return nil end
     
+    -- Body Colors (convert Color3 to table)
+    local function colorToTable(color)
+        return {R = color.R, G = color.G, B = color.B}
+    end
+    
     local data = {
-        -- Body Parts
+        -- Body Parts (Asset IDs)
         Head = safeGetProperty(desc, "Head", 0),
         Torso = safeGetProperty(desc, "Torso", 0),
         LeftArm = safeGetProperty(desc, "LeftArm", 0),
@@ -41,7 +47,7 @@ local function serializeHumanoidDescription(desc)
         LeftLeg = safeGetProperty(desc, "LeftLeg", 0),
         RightLeg = safeGetProperty(desc, "RightLeg", 0),
         
-        -- Accessories (dengan safe access)
+        -- Accessories (COMPLETE LIST - comma separated Asset IDs)
         HatAccessory = safeGetProperty(desc, "HatAccessory", ""),
         HairAccessory = safeGetProperty(desc, "HairAccessory", ""),
         FaceAccessory = safeGetProperty(desc, "FaceAccessory", ""),
@@ -51,13 +57,23 @@ local function serializeHumanoidDescription(desc)
         BackAccessory = safeGetProperty(desc, "BackAccessory", ""),
         WaistAccessory = safeGetProperty(desc, "WaistAccessory", ""),
         
-        -- Clothing
+        -- Clothing (Asset IDs)
         Shirt = safeGetProperty(desc, "Shirt", 0),
         Pants = safeGetProperty(desc, "Pants", 0),
         GraphicTShirt = safeGetProperty(desc, "GraphicTShirt", 0),
         
-        -- Face & Animation
+        -- Body Colors
+        HeadColor = colorToTable(safeGetProperty(desc, "HeadColor", Color3.new(1, 1, 1))),
+        TorsoColor = colorToTable(safeGetProperty(desc, "TorsoColor", Color3.new(1, 1, 1))),
+        LeftArmColor = colorToTable(safeGetProperty(desc, "LeftArmColor", Color3.new(1, 1, 1))),
+        RightArmColor = colorToTable(safeGetProperty(desc, "RightArmColor", Color3.new(1, 1, 1))),
+        LeftLegColor = colorToTable(safeGetProperty(desc, "LeftLegColor", Color3.new(1, 1, 1))),
+        RightLegColor = colorToTable(safeGetProperty(desc, "RightLegColor", Color3.new(1, 1, 1))),
+        
+        -- Face (Asset ID)
         Face = safeGetProperty(desc, "Face", 0),
+        
+        -- Animations (Asset IDs)
         ClimbAnimation = safeGetProperty(desc, "ClimbAnimation", 0),
         FallAnimation = safeGetProperty(desc, "FallAnimation", 0),
         IdleAnimation = safeGetProperty(desc, "IdleAnimation", 0),
@@ -66,26 +82,35 @@ local function serializeHumanoidDescription(desc)
         SwimAnimation = safeGetProperty(desc, "SwimAnimation", 0),
         WalkAnimation = safeGetProperty(desc, "WalkAnimation", 0),
         
-        -- Proportions
+        -- Emotes
+        EmotesDataInternal = safeGetProperty(desc, "EmotesDataInternal", ""),
+        EquippedEmotesDataInternal = safeGetProperty(desc, "EquippedEmotesDataInternal", ""),
+        
+        -- Proportions (Body Scales)
         BodyTypeScale = safeGetProperty(desc, "BodyTypeScale", 0),
         DepthScale = safeGetProperty(desc, "DepthScale", 1),
         HeadScale = safeGetProperty(desc, "HeadScale", 1),
         HeightScale = safeGetProperty(desc, "HeightScale", 1),
         ProportionScale = safeGetProperty(desc, "ProportionScale", 0),
-        WidthScale = safeGetProperty(desc, "WidthScale", 1)
+        WidthScale = safeGetProperty(desc, "WidthScale", 1),
+        
+        -- Additional Properties
+        MoodAnimation = safeGetProperty(desc, "MoodAnimation", 0),
+        PoseAnimation = safeGetProperty(desc, "PoseAnimation", 0)
     }
     
-    -- Body Colors (convert Color3 to table)
-    local function colorToTable(color)
-        return {R = color.R, G = color.G, B = color.B}
-    end
-    
-    data.HeadColor = colorToTable(safeGetProperty(desc, "HeadColor", Color3.new(1, 1, 1)))
-    data.TorsoColor = colorToTable(safeGetProperty(desc, "TorsoColor", Color3.new(1, 1, 1)))
-    data.LeftArmColor = colorToTable(safeGetProperty(desc, "LeftArmColor", Color3.new(1, 1, 1)))
-    data.RightArmColor = colorToTable(safeGetProperty(desc, "RightArmColor", Color3.new(1, 1, 1)))
-    data.LeftLegColor = colorToTable(safeGetProperty(desc, "LeftLegColor", Color3.new(1, 1, 1)))
-    data.RightLegColor = colorToTable(safeGetProperty(desc, "RightLegColor", Color3.new(1, 1, 1)))
+    -- Debug: Print accessories info
+    print("📦 Captured Accessories:")
+    print("  Hat: " .. data.HatAccessory)
+    print("  Hair: " .. data.HairAccessory)
+    print("  Face: " .. data.FaceAccessory)
+    print("  Neck: " .. data.NeckAccessory)
+    print("  Shoulder: " .. data.ShoulderAccessory)
+    print("  Front: " .. data.FrontAccessory)
+    print("  Back: " .. data.BackAccessory)
+    print("  Waist: " .. data.WaistAccessory)
+    print("  Shirt: " .. data.Shirt)
+    print("  Pants: " .. data.Pants)
     
     return data
 end
@@ -111,7 +136,7 @@ local function deserializeHumanoidDescription(data)
     safeSetProperty(desc, "LeftLeg", data.LeftLeg or 0)
     safeSetProperty(desc, "RightLeg", data.RightLeg or 0)
     
-    -- Accessories
+    -- Accessories (CRITICAL: Set complete strings)
     safeSetProperty(desc, "HatAccessory", data.HatAccessory or "")
     safeSetProperty(desc, "HairAccessory", data.HairAccessory or "")
     safeSetProperty(desc, "FaceAccessory", data.FaceAccessory or "")
@@ -141,7 +166,7 @@ local function deserializeHumanoidDescription(data)
     safeSetProperty(desc, "LeftLegColor", tableToColor(data.LeftLegColor))
     safeSetProperty(desc, "RightLegColor", tableToColor(data.RightLegColor))
     
-    -- Face & Animation
+    -- Face & Animations
     safeSetProperty(desc, "Face", data.Face or 0)
     safeSetProperty(desc, "ClimbAnimation", data.ClimbAnimation or 0)
     safeSetProperty(desc, "FallAnimation", data.FallAnimation or 0)
@@ -151,6 +176,10 @@ local function deserializeHumanoidDescription(data)
     safeSetProperty(desc, "SwimAnimation", data.SwimAnimation or 0)
     safeSetProperty(desc, "WalkAnimation", data.WalkAnimation or 0)
     
+    -- Emotes
+    safeSetProperty(desc, "EmotesDataInternal", data.EmotesDataInternal or "")
+    safeSetProperty(desc, "EquippedEmotesDataInternal", data.EquippedEmotesDataInternal or "")
+    
     -- Proportions
     safeSetProperty(desc, "BodyTypeScale", data.BodyTypeScale or 0)
     safeSetProperty(desc, "DepthScale", data.DepthScale or 1)
@@ -158,6 +187,16 @@ local function deserializeHumanoidDescription(data)
     safeSetProperty(desc, "HeightScale", data.HeightScale or 1)
     safeSetProperty(desc, "ProportionScale", data.ProportionScale or 0)
     safeSetProperty(desc, "WidthScale", data.WidthScale or 1)
+    
+    -- Additional
+    safeSetProperty(desc, "MoodAnimation", data.MoodAnimation or 0)
+    safeSetProperty(desc, "PoseAnimation", data.PoseAnimation or 0)
+    
+    print("🔄 Restored Accessories:")
+    print("  Hat: " .. (data.HatAccessory or ""))
+    print("  Hair: " .. (data.HairAccessory or ""))
+    print("  Shirt: " .. (data.Shirt or 0))
+    print("  Pants: " .. (data.Pants or 0))
     
     return desc
 end
@@ -176,7 +215,7 @@ local function loadPresets()
         
         if success and data then
             presets = data
-            print("✅ Loaded " .. #presets .. " full presets dari file")
+            print("✅ Loaded " .. #presets .. " complete presets dari file")
         end
     end
 end
@@ -194,7 +233,7 @@ local function savePresets()
     end)
     
     if success then
-        print("✅ Full presets saved to file")
+        print("✅ Complete presets saved to file")
     end
 end
 
@@ -258,7 +297,7 @@ local function createUI()
     TitleText.Size = UDim2.new(1, -20, 1, 0)
     TitleText.Position = UDim2.new(0, 10, 0, 0)
     TitleText.BackgroundTransparency = 1
-    TitleText.Text = "🎮 FULL AVATAR PRESET"
+    TitleText.Text = "🎮 COMPLETE AVATAR PRESET"
     TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleText.TextScaled = true
     TitleText.Font = Enum.Font.GothamBold
@@ -318,7 +357,7 @@ local function createUI()
     local PresetTitle = Instance.new("TextLabel")
     PresetTitle.Size = UDim2.new(1, 0, 0, 20)
     PresetTitle.BackgroundTransparency = 1
-    PresetTitle.Text = "⭐ FULL PRESETS (Right-Click to Save)"
+    PresetTitle.Text = "⭐ COMPLETE PRESETS (Right-Click to Save)"
     PresetTitle.TextColor3 = Color3.fromRGB(255, 200, 0)
     PresetTitle.TextScaled = true
     PresetTitle.Font = Enum.Font.GothamBold
@@ -373,7 +412,7 @@ local function createUI()
     StatusText.Size = UDim2.new(1, -10, 1, 0)
     StatusText.Position = UDim2.new(0, 5, 0, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "✨ Ready (Full Data Mode)"
+    StatusText.Text = "✨ Ready (Complete Mode)"
     StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
     StatusText.TextScaled = true
     StatusText.Font = Enum.Font.GothamBold
@@ -383,7 +422,7 @@ local function createUI()
     return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons
 end
 
--- Load Avatar Function dengan full data capture
+-- Load Avatar Function dengan COMPLETE data capture
 local function loadAvatar(username)
     if not username or username == "" then
         return false, "Username tidak boleh kosong!"
@@ -428,7 +467,7 @@ local function loadAvatar(username)
         end
     end
     
-    -- Hapus accessories & clothing
+    -- Hapus accessories & clothing (IMPORTANT untuk clean apply)
     pcall(function()
         for _, accessory in pairs(lp.Character:GetChildren()) do
             if accessory:IsA("Accessory") then
@@ -443,7 +482,7 @@ local function loadAvatar(username)
         end
     end)
     
-    wait(0.1)
+    wait(0.2)
     
     -- Apply avatar
     local success3 = pcall(function()
@@ -457,7 +496,7 @@ local function loadAvatar(username)
         return false, "Gagal apply avatar"
     end
     
-    wait(0.3)
+    wait(0.5) -- Wait lebih lama untuk semua accessories load
     
     -- Restore tools
     for _, tool in pairs(savedTools) do
@@ -474,11 +513,13 @@ local function loadAvatar(username)
         end
     end
     
-    -- CAPTURE FULL AVATAR DATA
+    -- CAPTURE COMPLETE AVATAR DATA
     currentAvatarData = {
         username = username,
         avatarData = serializeHumanoidDescription(humanoidDesc)
     }
+    
+    print("✅ Avatar loaded & captured completely!")
     
     return true, "Avatar changed: " .. username
 end
@@ -533,7 +574,7 @@ local function applyStoredAvatar(avatarData)
         end
     end)
     
-    wait(0.1)
+    wait(0.2)
     
     -- Apply avatar
     local success = pcall(function()
@@ -547,7 +588,7 @@ local function applyStoredAvatar(avatarData)
         return false, "Gagal apply avatar"
     end
     
-    wait(0.3)
+    wait(0.5) -- Wait untuk semua accessories load
     
     -- Restore tools
     for _, tool in pairs(savedTools) do
@@ -565,6 +606,8 @@ local function applyStoredAvatar(avatarData)
     end
     
     currentAvatarData = avatarData
+    
+    print("✅ Preset applied completely!")
     
     return true, "Avatar loaded: " .. (avatarData.username or "Preset")
 end
@@ -699,14 +742,14 @@ local function handleSubmit()
     if username and username ~= "" then
         UsernameInput.PlaceholderText = "Loading..."
         UsernameInput.Text = ""
-        StatusText.Text = "⏳ Applying full avatar..."
+        StatusText.Text = "⏳ Applying complete avatar..."
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
         local success, message = loadAvatar(username)
         
         if success then
             UsernameInput.PlaceholderText = "✓ Active: " .. username
-            StatusText.Text = "✅ Full Avatar Saved: " .. username
+            StatusText.Text = "✅ Complete Avatar Saved: " .. username
             StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
             UsernameInput.PlaceholderText = "✗ Failed"
@@ -715,7 +758,7 @@ local function handleSubmit()
             
             wait(3)
             UsernameInput.PlaceholderText = "Enter username..."
-            StatusText.Text = "✨ Ready (Full Data Mode)"
+            StatusText.Text = "✨ Ready (Complete Mode)"
             StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
     end
@@ -742,7 +785,7 @@ for i, btn in ipairs(presetButtons) do
     -- Left Click: Load preset
     btn.MouseButton1Click:Connect(function()
         if presets[i] then
-            StatusText.Text = "⏳ Loading Full Preset " .. i .. "..."
+            StatusText.Text = "⏳ Loading Complete Preset " .. i .. "..."
             StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
             
             local success, message = applyStoredAvatar(presets[i])
@@ -760,14 +803,14 @@ for i, btn in ipairs(presetButtons) do
         end
     end)
     
-    -- Right Click: Save current avatar FULL DATA
+    -- Right Click: Save current avatar COMPLETE DATA
     btn.MouseButton2Click:Connect(function()
         if currentAvatarData then
             presets[i] = currentAvatarData
             savePresets()
             updatePresetUI(presetButtons)
             
-            StatusText.Text = "💾 Full Avatar saved to Preset " .. i .. "!"
+            StatusText.Text = "💾 Complete Avatar saved to Preset " .. i .. "!"
             StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
             StatusText.Text = "⚠️ Apply avatar first!"
@@ -791,9 +834,9 @@ updatePresetUI(presetButtons)
 lp.CharacterAdded:Connect(function(char)
     if currentAvatarData then
         char:WaitForChild("Humanoid")
-        wait(1)
+        wait(1.5)
         
-        StatusText.Text = "🔄 Auto-reapplying full avatar..."
+        StatusText.Text = "🔄 Auto-reapplying complete avatar..."
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
         local success, message = applyStoredAvatar(currentAvatarData)
@@ -816,12 +859,3 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("=== AVATAR CHANGER - FULL PRESET SYSTEM ===")
-print("✅ Menyimpan SELURUH data avatar")
-print("✅ Accessories, Clothing, Body Colors, Animations")
-print("✅ 5 Preset tersimpan ke file")
-print("✅ Left Click = Load Full Preset")
-print("✅ Right Click = Save Full Avatar Data")
-print("✅ Auto load setelah rejoin/respawn")
-print("✅ Tekan F1 untuk toggle UI")
-print("============================================")
