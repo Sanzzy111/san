@@ -20,60 +20,81 @@ local currentAvatarData = nil
 local presets = {}
 local PRESET_FILE = "avatar_full_presets.json"
 
+-- Function untuk safely get property
+local function safeGetProperty(obj, propName, default)
+    local success, value = pcall(function()
+        return obj[propName]
+    end)
+    return success and value or default
+end
+
 -- Function untuk serialize HumanoidDescription
 local function serializeHumanoidDescription(desc)
     if not desc then return nil end
     
-    return {
+    local data = {
         -- Body Parts
-        Head = desc.Head,
-        Torso = desc.Torso,
-        LeftArm = desc.LeftArm,
-        RightArm = desc.RightArm,
-        LeftLeg = desc.LeftLeg,
-        RightLeg = desc.RightLeg,
+        Head = safeGetProperty(desc, "Head", 0),
+        Torso = safeGetProperty(desc, "Torso", 0),
+        LeftArm = safeGetProperty(desc, "LeftArm", 0),
+        RightArm = safeGetProperty(desc, "RightArm", 0),
+        LeftLeg = safeGetProperty(desc, "LeftLeg", 0),
+        RightLeg = safeGetProperty(desc, "RightLeg", 0),
         
-        -- Accessories
-        HatAccessory = desc.HatAccessory,
-        HairAccessory = desc.HairAccessory,
-        FaceAccessory = desc.FaceAccessory,
-        NeckAccessory = desc.NeckAccessory,
-        ShoulderAccessory = desc.ShoulderAccessory,
-        FrontAccessory = desc.FrontAccessory,
-        BackAccessory = desc.BackAccessory,
-        WaistAccessory = desc.WaistAccessory,
+        -- Accessories (dengan safe access)
+        HatAccessory = safeGetProperty(desc, "HatAccessory", ""),
+        HairAccessory = safeGetProperty(desc, "HairAccessory", ""),
+        FaceAccessory = safeGetProperty(desc, "FaceAccessory", ""),
+        NeckAccessory = safeGetProperty(desc, "NeckAccessory", ""),
+        ShoulderAccessory = safeGetProperty(desc, "ShoulderAccessory", ""),
+        FrontAccessory = safeGetProperty(desc, "FrontAccessory", ""),
+        BackAccessory = safeGetProperty(desc, "BackAccessory", ""),
+        WaistAccessory = safeGetProperty(desc, "WaistAccessory", ""),
         
         -- Clothing
-        Shirt = desc.Shirt,
-        Pants = desc.Pants,
-        GraphicTShirt = desc.GraphicTShirt,
-        
-        -- Body Colors
-        HeadColor = desc.HeadColor,
-        TorsoColor = desc.TorsoColor,
-        LeftArmColor = desc.LeftArmColor,
-        RightArmColor = desc.RightArmColor,
-        LeftLegColor = desc.LeftLegColor,
-        RightLegColor = desc.RightLegColor,
+        Shirt = safeGetProperty(desc, "Shirt", 0),
+        Pants = safeGetProperty(desc, "Pants", 0),
+        GraphicTShirt = safeGetProperty(desc, "GraphicTShirt", 0),
         
         -- Face & Animation
-        Face = desc.Face,
-        ClimbAnimation = desc.ClimbAnimation,
-        FallAnimation = desc.FallAnimation,
-        IdleAnimation = desc.IdleAnimation,
-        JumpAnimation = desc.JumpAnimation,
-        RunAnimation = desc.RunAnimation,
-        SwimAnimation = desc.SwimAnimation,
-        WalkAnimation = desc.WalkAnimation,
+        Face = safeGetProperty(desc, "Face", 0),
+        ClimbAnimation = safeGetProperty(desc, "ClimbAnimation", 0),
+        FallAnimation = safeGetProperty(desc, "FallAnimation", 0),
+        IdleAnimation = safeGetProperty(desc, "IdleAnimation", 0),
+        JumpAnimation = safeGetProperty(desc, "JumpAnimation", 0),
+        RunAnimation = safeGetProperty(desc, "RunAnimation", 0),
+        SwimAnimation = safeGetProperty(desc, "SwimAnimation", 0),
+        WalkAnimation = safeGetProperty(desc, "WalkAnimation", 0),
         
         -- Proportions
-        BodyTypeScale = desc.BodyTypeScale,
-        DepthScale = desc.DepthScale,
-        HeadScale = desc.HeadScale,
-        HeightScale = desc.HeightScale,
-        ProportionScale = desc.ProportionScale,
-        WidthScale = desc.WidthScale
+        BodyTypeScale = safeGetProperty(desc, "BodyTypeScale", 0),
+        DepthScale = safeGetProperty(desc, "DepthScale", 1),
+        HeadScale = safeGetProperty(desc, "HeadScale", 1),
+        HeightScale = safeGetProperty(desc, "HeightScale", 1),
+        ProportionScale = safeGetProperty(desc, "ProportionScale", 0),
+        WidthScale = safeGetProperty(desc, "WidthScale", 1)
     }
+    
+    -- Body Colors (convert Color3 to table)
+    local function colorToTable(color)
+        return {R = color.R, G = color.G, B = color.B}
+    end
+    
+    data.HeadColor = colorToTable(safeGetProperty(desc, "HeadColor", Color3.new(1, 1, 1)))
+    data.TorsoColor = colorToTable(safeGetProperty(desc, "TorsoColor", Color3.new(1, 1, 1)))
+    data.LeftArmColor = colorToTable(safeGetProperty(desc, "LeftArmColor", Color3.new(1, 1, 1)))
+    data.RightArmColor = colorToTable(safeGetProperty(desc, "RightArmColor", Color3.new(1, 1, 1)))
+    data.LeftLegColor = colorToTable(safeGetProperty(desc, "LeftLegColor", Color3.new(1, 1, 1)))
+    data.RightLegColor = colorToTable(safeGetProperty(desc, "RightLegColor", Color3.new(1, 1, 1)))
+    
+    return data
+end
+
+-- Function untuk safely set property
+local function safeSetProperty(obj, propName, value)
+    pcall(function()
+        obj[propName] = value
+    end)
 end
 
 -- Function untuk deserialize ke HumanoidDescription
@@ -83,53 +104,60 @@ local function deserializeHumanoidDescription(data)
     local desc = Instance.new("HumanoidDescription")
     
     -- Body Parts
-    desc.Head = data.Head or 0
-    desc.Torso = data.Torso or 0
-    desc.LeftArm = data.LeftArm or 0
-    desc.RightArm = data.RightArm or 0
-    desc.LeftLeg = data.LeftLeg or 0
-    desc.RightLeg = data.RightLeg or 0
+    safeSetProperty(desc, "Head", data.Head or 0)
+    safeSetProperty(desc, "Torso", data.Torso or 0)
+    safeSetProperty(desc, "LeftArm", data.LeftArm or 0)
+    safeSetProperty(desc, "RightArm", data.RightArm or 0)
+    safeSetProperty(desc, "LeftLeg", data.LeftLeg or 0)
+    safeSetProperty(desc, "RightLeg", data.RightLeg or 0)
     
     -- Accessories
-    desc.HatAccessory = data.HatAccessory or ""
-    desc.HairAccessory = data.HairAccessory or ""
-    desc.FaceAccessory = data.FaceAccessory or ""
-    desc.NeckAccessory = data.NeckAccessory or ""
-    desc.ShoulderAccessory = data.ShoulderAccessory or ""
-    desc.FrontAccessory = data.FrontAccessory or ""
-    desc.BackAccessory = data.BackAccessory or ""
-    desc.WaistAccessory = data.WaistAccessory or ""
+    safeSetProperty(desc, "HatAccessory", data.HatAccessory or "")
+    safeSetProperty(desc, "HairAccessory", data.HairAccessory or "")
+    safeSetProperty(desc, "FaceAccessory", data.FaceAccessory or "")
+    safeSetProperty(desc, "NeckAccessory", data.NeckAccessory or "")
+    safeSetProperty(desc, "ShoulderAccessory", data.ShoulderAccessory or "")
+    safeSetProperty(desc, "FrontAccessory", data.FrontAccessory or "")
+    safeSetProperty(desc, "BackAccessory", data.BackAccessory or "")
+    safeSetProperty(desc, "WaistAccessory", data.WaistAccessory or "")
     
     -- Clothing
-    desc.Shirt = data.Shirt or 0
-    desc.Pants = data.Pants or 0
-    desc.GraphicTShirt = data.GraphicTShirt or 0
+    safeSetProperty(desc, "Shirt", data.Shirt or 0)
+    safeSetProperty(desc, "Pants", data.Pants or 0)
+    safeSetProperty(desc, "GraphicTShirt", data.GraphicTShirt or 0)
     
-    -- Body Colors
-    desc.HeadColor = data.HeadColor or Color3.new(1, 1, 1)
-    desc.TorsoColor = data.TorsoColor or Color3.new(1, 1, 1)
-    desc.LeftArmColor = data.LeftArmColor or Color3.new(1, 1, 1)
-    desc.RightArmColor = data.RightArmColor or Color3.new(1, 1, 1)
-    desc.LeftLegColor = data.LeftLegColor or Color3.new(1, 1, 1)
-    desc.RightLegColor = data.RightLegColor or Color3.new(1, 1, 1)
+    -- Body Colors (convert table back to Color3)
+    local function tableToColor(t)
+        if type(t) == "table" and t.R and t.G and t.B then
+            return Color3.new(t.R, t.G, t.B)
+        end
+        return Color3.new(1, 1, 1)
+    end
+    
+    safeSetProperty(desc, "HeadColor", tableToColor(data.HeadColor))
+    safeSetProperty(desc, "TorsoColor", tableToColor(data.TorsoColor))
+    safeSetProperty(desc, "LeftArmColor", tableToColor(data.LeftArmColor))
+    safeSetProperty(desc, "RightArmColor", tableToColor(data.RightArmColor))
+    safeSetProperty(desc, "LeftLegColor", tableToColor(data.LeftLegColor))
+    safeSetProperty(desc, "RightLegColor", tableToColor(data.RightLegColor))
     
     -- Face & Animation
-    desc.Face = data.Face or 0
-    desc.ClimbAnimation = data.ClimbAnimation or 0
-    desc.FallAnimation = data.FallAnimation or 0
-    desc.IdleAnimation = data.IdleAnimation or 0
-    desc.JumpAnimation = data.JumpAnimation or 0
-    desc.RunAnimation = data.RunAnimation or 0
-    desc.SwimAnimation = data.SwimAnimation or 0
-    desc.WalkAnimation = data.WalkAnimation or 0
+    safeSetProperty(desc, "Face", data.Face or 0)
+    safeSetProperty(desc, "ClimbAnimation", data.ClimbAnimation or 0)
+    safeSetProperty(desc, "FallAnimation", data.FallAnimation or 0)
+    safeSetProperty(desc, "IdleAnimation", data.IdleAnimation or 0)
+    safeSetProperty(desc, "JumpAnimation", data.JumpAnimation or 0)
+    safeSetProperty(desc, "RunAnimation", data.RunAnimation or 0)
+    safeSetProperty(desc, "SwimAnimation", data.SwimAnimation or 0)
+    safeSetProperty(desc, "WalkAnimation", data.WalkAnimation or 0)
     
     -- Proportions
-    desc.BodyTypeScale = data.BodyTypeScale or 0
-    desc.DepthScale = data.DepthScale or 1
-    desc.HeadScale = data.HeadScale or 1
-    desc.HeightScale = data.HeightScale or 1
-    desc.ProportionScale = data.ProportionScale or 0
-    desc.WidthScale = data.WidthScale or 1
+    safeSetProperty(desc, "BodyTypeScale", data.BodyTypeScale or 0)
+    safeSetProperty(desc, "DepthScale", data.DepthScale or 1)
+    safeSetProperty(desc, "HeadScale", data.HeadScale or 1)
+    safeSetProperty(desc, "HeightScale", data.HeightScale or 1)
+    safeSetProperty(desc, "ProportionScale", data.ProportionScale or 0)
+    safeSetProperty(desc, "WidthScale", data.WidthScale or 1)
     
     return desc
 end
