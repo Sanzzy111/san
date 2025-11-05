@@ -1,13 +1,13 @@
--- AVATAR CHANGER - CAPTURE APPLIED AVATAR PRESET
--- ✅ Menyimpan avatar yang SUDAH DI-APPLY (bukan dari API)
--- ✅ Capture EXACT avatar yang sedang dipakai
--- ✅ 5 Preset Avatar tersimpan ke file
--- ✅ Auto load preset setelah rejoin/ganti map
--- ✅ Tools tidak hilang saat equip
+-- AVATAR CHANGER - PRESET SYSTEM
+-- 5 Preset Avatar disimpan sebagai FULL SNAPSHOT
+-- Auto load setelah rejoin/ganti map
+-- Tools tidak hilang saat equip
+-- Avatar tetap meski user asli ganti avatar
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 local lp = Players.LocalPlayer
 
@@ -17,203 +17,51 @@ local UIState = {
     isAnimating = false
 }
 
-local currentAvatarData = nil
+local lastAppliedUsername = nil
+local lastAppliedDesc = nil
 local presets = {}
-local PRESET_FILE = "avatar_applied_presets.json"
+local PRESET_FILE = "avatar_presets.json"
 
--- Function untuk safely get property
-local function safeGetProperty(obj, propName, default)
-    local success, value = pcall(function()
-        return obj[propName]
-    end)
-    return success and value or default
-end
-
--- Function untuk CAPTURE avatar yang SUDAH DI-APPLY di character
-local function captureCurrentAvatar()
-    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
-        return nil
-    end
+-- Serialize HumanoidDescription ke table
+local function getDescTable(desc)
+    local descTable = {}
     
-    local humanoid = lp.Character.Humanoid
-    
-    -- Get HumanoidDescription dari character yang SEDANG AKTIF
-    local currentDesc = nil
-    local success = pcall(function()
-        currentDesc = humanoid:GetAppliedDescription()
-    end)
-    
-    if not success or not currentDesc then
-        warn("❌ Gagal capture avatar yang sedang aktif")
-        return nil
-    end
-    
-    -- Body Colors (convert Color3 to table)
-    local function colorToTable(color)
-        return {R = color.R, G = color.G, B = color.B}
-    end
-    
-    local data = {
-        -- Body Parts (Asset IDs)
-        Head = safeGetProperty(currentDesc, "Head", 0),
-        Torso = safeGetProperty(currentDesc, "Torso", 0),
-        LeftArm = safeGetProperty(currentDesc, "LeftArm", 0),
-        RightArm = safeGetProperty(currentDesc, "RightArm", 0),
-        LeftLeg = safeGetProperty(currentDesc, "LeftLeg", 0),
-        RightLeg = safeGetProperty(currentDesc, "RightLeg", 0),
-        
-        -- Accessories (COMPLETE LIST - comma separated Asset IDs)
-        HatAccessory = safeGetProperty(currentDesc, "HatAccessory", ""),
-        HairAccessory = safeGetProperty(currentDesc, "HairAccessory", ""),
-        FaceAccessory = safeGetProperty(currentDesc, "FaceAccessory", ""),
-        NeckAccessory = safeGetProperty(currentDesc, "NeckAccessory", ""),
-        ShoulderAccessory = safeGetProperty(currentDesc, "ShoulderAccessory", ""),
-        FrontAccessory = safeGetProperty(currentDesc, "FrontAccessory", ""),
-        BackAccessory = safeGetProperty(currentDesc, "BackAccessory", ""),
-        WaistAccessory = safeGetProperty(currentDesc, "WaistAccessory", ""),
-        
-        -- Clothing (Asset IDs)
-        Shirt = safeGetProperty(currentDesc, "Shirt", 0),
-        Pants = safeGetProperty(currentDesc, "Pants", 0),
-        GraphicTShirt = safeGetProperty(currentDesc, "GraphicTShirt", 0),
-        
-        -- Body Colors
-        HeadColor = colorToTable(safeGetProperty(currentDesc, "HeadColor", Color3.new(1, 1, 1))),
-        TorsoColor = colorToTable(safeGetProperty(currentDesc, "TorsoColor", Color3.new(1, 1, 1))),
-        LeftArmColor = colorToTable(safeGetProperty(currentDesc, "LeftArmColor", Color3.new(1, 1, 1))),
-        RightArmColor = colorToTable(safeGetProperty(currentDesc, "RightArmColor", Color3.new(1, 1, 1))),
-        LeftLegColor = colorToTable(safeGetProperty(currentDesc, "LeftLegColor", Color3.new(1, 1, 1))),
-        RightLegColor = colorToTable(safeGetProperty(currentDesc, "RightLegColor", Color3.new(1, 1, 1))),
-        
-        -- Face (Asset ID)
-        Face = safeGetProperty(currentDesc, "Face", 0),
-        
-        -- Animations (Asset IDs)
-        ClimbAnimation = safeGetProperty(currentDesc, "ClimbAnimation", 0),
-        FallAnimation = safeGetProperty(currentDesc, "FallAnimation", 0),
-        IdleAnimation = safeGetProperty(currentDesc, "IdleAnimation", 0),
-        JumpAnimation = safeGetProperty(currentDesc, "JumpAnimation", 0),
-        RunAnimation = safeGetProperty(currentDesc, "RunAnimation", 0),
-        SwimAnimation = safeGetProperty(currentDesc, "SwimAnimation", 0),
-        WalkAnimation = safeGetProperty(currentDesc, "WalkAnimation", 0),
-        
-        -- Emotes
-        EmotesDataInternal = safeGetProperty(currentDesc, "EmotesDataInternal", ""),
-        EquippedEmotesDataInternal = safeGetProperty(currentDesc, "EquippedEmotesDataInternal", ""),
-        
-        -- Proportions (Body Scales)
-        BodyTypeScale = safeGetProperty(currentDesc, "BodyTypeScale", 0),
-        DepthScale = safeGetProperty(currentDesc, "DepthScale", 1),
-        HeadScale = safeGetProperty(currentDesc, "HeadScale", 1),
-        HeightScale = safeGetProperty(currentDesc, "HeightScale", 1),
-        ProportionScale = safeGetProperty(currentDesc, "ProportionScale", 0),
-        WidthScale = safeGetProperty(currentDesc, "WidthScale", 1),
-        
-        -- Additional Properties
-        MoodAnimation = safeGetProperty(currentDesc, "MoodAnimation", 0),
-        PoseAnimation = safeGetProperty(currentDesc, "PoseAnimation", 0)
+    local props = {
+        "Accessories", "BackAccessory", "ClimbAnimation", "FaceAccessory", "FallAnimation", 
+        "FrontAccessory", "GraphicTShirt", "HairAccessory", "HatAccessory", "IdleAnimation", 
+        "JumpAnimation", "MoodAnimation", "NeckAccessory", "Pants", "RunAnimation", 
+        "Shirt", "ShouldersAccessory", "SwimAnimation", "WaistAccessory", "WalkAnimation", 
+        "Emotes", "EquippedEmotes", "Face", "Head", "LeftArm", "LeftLeg", "RightArm", 
+        "RightLeg", "Torso"
     }
-    
-    -- Debug: Print accessories info
-    print("📦 CAPTURED FROM APPLIED AVATAR:")
-    print("  Hat: " .. data.HatAccessory)
-    print("  Hair: " .. data.HairAccessory)
-    print("  Face Accessory: " .. data.FaceAccessory)
-    print("  Neck: " .. data.NeckAccessory)
-    print("  Shoulder: " .. data.ShoulderAccessory)
-    print("  Front: " .. data.FrontAccessory)
-    print("  Back: " .. data.BackAccessory)
-    print("  Waist: " .. data.WaistAccessory)
-    print("  Shirt: " .. data.Shirt)
-    print("  Pants: " .. data.Pants)
-    print("  GraphicTShirt: " .. data.GraphicTShirt)
-    
-    return data
-end
-
--- Function untuk safely set property
-local function safeSetProperty(obj, propName, value)
-    pcall(function()
-        obj[propName] = value
-    end)
-end
-
--- Function untuk create HumanoidDescription dari data
-local function createHumanoidDescription(data)
-    if not data then return nil end
-    
-    local desc = Instance.new("HumanoidDescription")
-    
-    -- Body Parts
-    safeSetProperty(desc, "Head", data.Head or 0)
-    safeSetProperty(desc, "Torso", data.Torso or 0)
-    safeSetProperty(desc, "LeftArm", data.LeftArm or 0)
-    safeSetProperty(desc, "RightArm", data.RightArm or 0)
-    safeSetProperty(desc, "LeftLeg", data.LeftLeg or 0)
-    safeSetProperty(desc, "RightLeg", data.RightLeg or 0)
-    
-    -- Accessories (CRITICAL: Set complete strings)
-    safeSetProperty(desc, "HatAccessory", data.HatAccessory or "")
-    safeSetProperty(desc, "HairAccessory", data.HairAccessory or "")
-    safeSetProperty(desc, "FaceAccessory", data.FaceAccessory or "")
-    safeSetProperty(desc, "NeckAccessory", data.NeckAccessory or "")
-    safeSetProperty(desc, "ShoulderAccessory", data.ShoulderAccessory or "")
-    safeSetProperty(desc, "FrontAccessory", data.FrontAccessory or "")
-    safeSetProperty(desc, "BackAccessory", data.BackAccessory or "")
-    safeSetProperty(desc, "WaistAccessory", data.WaistAccessory or "")
-    
-    -- Clothing
-    safeSetProperty(desc, "Shirt", data.Shirt or 0)
-    safeSetProperty(desc, "Pants", data.Pants or 0)
-    safeSetProperty(desc, "GraphicTShirt", data.GraphicTShirt or 0)
-    
-    -- Body Colors (convert table back to Color3)
-    local function tableToColor(t)
-        if type(t) == "table" and t.R and t.G and t.B then
-            return Color3.new(t.R, t.G, t.B)
-        end
-        return Color3.new(1, 1, 1)
+    for _, prop in ipairs(props) do
+        descTable[prop] = desc[prop]
     end
     
-    safeSetProperty(desc, "HeadColor", tableToColor(data.HeadColor))
-    safeSetProperty(desc, "TorsoColor", tableToColor(data.TorsoColor))
-    safeSetProperty(desc, "LeftArmColor", tableToColor(data.LeftArmColor))
-    safeSetProperty(desc, "RightArmColor", tableToColor(data.RightArmColor))
-    safeSetProperty(desc, "LeftLegColor", tableToColor(data.LeftLegColor))
-    safeSetProperty(desc, "RightLegColor", tableToColor(data.RightLegColor))
+    local scales = {"BodyTypeScale", "DepthScale", "HeadScale", "HeightScale", "ProportionScale", "WidthScale"}
+    for _, prop in ipairs(scales) do
+        descTable[prop] = desc[prop]
+    end
     
-    -- Face & Animations
-    safeSetProperty(desc, "Face", data.Face or 0)
-    safeSetProperty(desc, "ClimbAnimation", data.ClimbAnimation or 0)
-    safeSetProperty(desc, "FallAnimation", data.FallAnimation or 0)
-    safeSetProperty(desc, "IdleAnimation", data.IdleAnimation or 0)
-    safeSetProperty(desc, "JumpAnimation", data.JumpAnimation or 0)
-    safeSetProperty(desc, "RunAnimation", data.RunAnimation or 0)
-    safeSetProperty(desc, "SwimAnimation", data.SwimAnimation or 0)
-    safeSetProperty(desc, "WalkAnimation", data.WalkAnimation or 0)
+    local colors = {"HeadColor", "LeftArmColor", "LeftLegColor", "RightArmColor", "RightLegColor", "TorsoColor"}
+    for _, prop in ipairs(colors) do
+        local c = desc[prop]
+        descTable[prop] = {c.R, c.G, c.B}
+    end
     
-    -- Emotes
-    safeSetProperty(desc, "EmotesDataInternal", data.EmotesDataInternal or "")
-    safeSetProperty(desc, "EquippedEmotesDataInternal", data.EquippedEmotesDataInternal or "")
-    
-    -- Proportions
-    safeSetProperty(desc, "BodyTypeScale", data.BodyTypeScale or 0)
-    safeSetProperty(desc, "DepthScale", data.DepthScale or 1)
-    safeSetProperty(desc, "HeadScale", data.HeadScale or 1)
-    safeSetProperty(desc, "HeightScale", data.HeightScale or 1)
-    safeSetProperty(desc, "ProportionScale", data.ProportionScale or 0)
-    safeSetProperty(desc, "WidthScale", data.WidthScale or 1)
-    
-    -- Additional
-    safeSetProperty(desc, "MoodAnimation", data.MoodAnimation or 0)
-    safeSetProperty(desc, "PoseAnimation", data.PoseAnimation or 0)
-    
-    print("🔄 RESTORED AVATAR:")
-    print("  Hat: " .. (data.HatAccessory or ""))
-    print("  Hair: " .. (data.HairAccessory or ""))
-    print("  Shirt: " .. (data.Shirt or 0))
-    print("  Pants: " .. (data.Pants or 0))
-    
+    return descTable
+end
+
+-- Buat HumanoidDescription dari table
+local function createDescFromTable(tbl)
+    local desc = Instance.new("HumanoidDescription")
+    for prop, value in pairs(tbl) do
+        if type(value) == "table" and #value == 3 then
+            desc[prop] = Color3.new(value[1], value[2], value[3])
+        else
+            desc[prop] = value
+        end
+    end
     return desc
 end
 
@@ -226,12 +74,17 @@ local function loadPresets()
     
     if isfile(PRESET_FILE) then
         local success, data = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(readfile(PRESET_FILE))
+            return HttpService:JSONDecode(readfile(PRESET_FILE))
         end)
         
         if success and data then
+            for i, p in ipairs(data) do
+                if type(p) == "string" then
+                    data[i] = {username = p}
+                end
+            end
             presets = data
-            print("✅ Loaded " .. #presets .. " applied presets dari file")
+            print("Loaded " .. #presets .. " presets dari file")
         end
     end
 end
@@ -244,16 +97,16 @@ local function savePresets()
     end
     
     local success = pcall(function()
-        local json = game:GetService("HttpService"):JSONEncode(presets)
+        local json = HttpService:JSONEncode(presets)
         writefile(PRESET_FILE, json)
     end)
     
     if success then
-        print("✅ Applied presets saved to file")
+        print("Presets saved to file")
     end
 end
 
--- Toggle Button Creation
+-- Toggle Button
 local function createToggleButton()
     local ToggleButton = Instance.new("TextButton")
     ToggleButton.Name = "ToggleButton"
@@ -261,20 +114,20 @@ local function createToggleButton()
     ToggleButton.Position = UDim2.new(0, 15, 0, 15)
     ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     ToggleButton.BorderSizePixel = 0
-    ToggleButton.Text = "🎮"
+    ToggleButton.Text = "Game"
     ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     ToggleButton.TextScaled = true
     ToggleButton.Font = Enum.Font.GothamBold
     ToggleButton.ZIndex = 10
     
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(1, 0)
-    ToggleCorner.Parent = ToggleButton
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = ToggleButton
     
     return ToggleButton
 end
 
--- UI Creation dengan Preset Buttons
+-- UI Creation
 local function createUI()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "RobloxAccountLoader"
@@ -299,7 +152,6 @@ local function createUI()
     MainCorner.Parent = MainFrame
     
     local TitleBar = Instance.new("Frame")
-    TitleBar.Name = "TitleBar"
     TitleBar.Size = UDim2.new(1, 0, 0, 30)
     TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     TitleBar.BorderSizePixel = 0
@@ -313,7 +165,7 @@ local function createUI()
     TitleText.Size = UDim2.new(1, -20, 1, 0)
     TitleText.Position = UDim2.new(0, 10, 0, 0)
     TitleText.BackgroundTransparency = 1
-    TitleText.Text = "🎮 APPLIED AVATAR PRESET"
+    TitleText.Text = "AVATAR CHANGER (PRESET)"
     TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleText.TextScaled = true
     TitleText.Font = Enum.Font.GothamBold
@@ -343,7 +195,6 @@ local function createUI()
     UsernameCorner.Parent = UsernameInput
     
     local SubmitButton = Instance.new("TextButton")
-    SubmitButton.Name = "SubmitButton"
     SubmitButton.Size = UDim2.new(0.3, -5, 1, 0)
     SubmitButton.Position = UDim2.new(0.7, 0, 0, 0)
     SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
@@ -373,13 +224,12 @@ local function createUI()
     local PresetTitle = Instance.new("TextLabel")
     PresetTitle.Size = UDim2.new(1, 0, 0, 20)
     PresetTitle.BackgroundTransparency = 1
-    PresetTitle.Text = "⭐ APPLIED PRESETS (Right-Click to Save)"
+    PresetTitle.Text = "PRESETS (Right-Click to Save)"
     PresetTitle.TextColor3 = Color3.fromRGB(255, 200, 0)
     PresetTitle.TextScaled = true
     PresetTitle.Font = Enum.Font.GothamBold
     PresetTitle.Parent = PresetFrame
     
-    -- 5 Preset Buttons
     local presetButtons = {}
     for i = 1, 5 do
         local btn = Instance.new("TextButton")
@@ -428,7 +278,7 @@ local function createUI()
     StatusText.Size = UDim2.new(1, -10, 1, 0)
     StatusText.Position = UDim2.new(0, 5, 0, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "✨ Ready (Applied Capture Mode)"
+    StatusText.Text = "Ready (Tools Protected)"
     StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
     StatusText.TextScaled = true
     StatusText.Font = Enum.Font.GothamBold
@@ -438,134 +288,31 @@ local function createUI()
     return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons
 end
 
--- Load Avatar Function
-local function loadAvatar(username)
-    if not username or username == "" then
-        return false, "Username tidak boleh kosong!"
-    end
-    
-    local success, userId = pcall(function()
-        return Players:GetUserIdFromNameAsync(username)
-    end)
-    
-    if not success then
-        return false, "Username tidak ditemukan: " .. username
-    end
-    
+-- Apply Avatar (dari username atau descTable)
+local function applyAvatar(username, descTable)
     if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
         return false, "Character tidak ada!"
     end
     
     local humanoidDesc
-    local success2 = pcall(function()
-        humanoidDesc = Players:GetHumanoidDescriptionFromUserId(userId)
-    end)
-    
-    if not success2 or not humanoidDesc then
-        return false, "Gagal mendapatkan avatar"
-    end
-    
-    -- Simpan tools
-    local savedTools = {}
-    local equippedTool = nil
-    
-    for _, item in pairs(lp.Character:GetChildren()) do
-        if item:IsA("Tool") then
-            equippedTool = item
-            table.insert(savedTools, item:Clone())
-            item.Parent = nil
-        end
-    end
-    
-    for _, item in pairs(lp.Backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            table.insert(savedTools, item:Clone())
-        end
-    end
-    
-    -- Hapus accessories & clothing
-    pcall(function()
-        for _, accessory in pairs(lp.Character:GetChildren()) do
-            if accessory:IsA("Accessory") then
-                accessory:Destroy()
-            end
-        end
-        
-        for _, clothing in pairs(lp.Character:GetChildren()) do
-            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
-                clothing:Destroy()
-            end
-        end
-    end)
-    
-    wait(0.2)
-    
-    -- Apply avatar
-    local success3 = pcall(function()
-        lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
-    end)
-    
-    if not success3 then
-        for _, tool in pairs(savedTools) do
-            tool.Parent = lp.Backpack
-        end
-        return false, "Gagal apply avatar"
-    end
-    
-    wait(1) -- Wait untuk semua accessories fully load
-    
-    -- Restore tools
-    for _, tool in pairs(savedTools) do
-        if tool and tool:IsA("Tool") then
-            tool.Parent = lp.Backpack
-        end
-    end
-    
-    if equippedTool then
-        wait(0.1)
-        local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
-        if toolInBackpack then
-            lp.Character.Humanoid:EquipTool(toolInBackpack)
-        end
-    end
-    
-    -- CAPTURE avatar SETELAH di-apply (INI YANG PENTING!)
-    wait(0.5) -- Extra wait untuk ensure semua loaded
-    local capturedData = captureCurrentAvatar()
-    
-    if capturedData then
-        currentAvatarData = {
-            username = username,
-            avatarData = capturedData
-        }
-        print("✅ Avatar applied & captured successfully!")
-        return true, "Avatar changed: " .. username
+    if descTable then
+        local success, result = pcall(createDescFromTable, descTable)
+        if not success then return false, "Gagal load preset" end
+        humanoidDesc = result
     else
-        return false, "Avatar applied tapi gagal capture"
-    end
-end
-
--- Apply avatar dari data yang tersimpan
-local function applyStoredAvatar(avatarData)
-    if not avatarData or not avatarData.avatarData then
-        return false, "Data avatar tidak valid!"
-    end
-    
-    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
-        return false, "Character tidak ada!"
-    end
-    
-    -- Create HumanoidDescription dari data
-    local humanoidDesc = createHumanoidDescription(avatarData.avatarData)
-    
-    if not humanoidDesc then
-        return false, "Gagal restore avatar data"
+        if not username or username == "" then
+            return false, "Username kosong!"
+        end
+        local success, userId = pcall(Players.GetUserIdFromNameAsync, Players, username)
+        if not success then return false, "User tidak ditemukan" end
+        local success2, result = pcall(Players.GetHumanoidDescriptionFromUserId, Players, userId)
+        if not success2 then return false, "Gagal ambil avatar" end
+        humanoidDesc = result
     end
     
     -- Simpan tools
     local savedTools = {}
     local equippedTool = nil
-    
     for _, item in pairs(lp.Character:GetChildren()) do
         if item:IsA("Tool") then
             equippedTool = item
@@ -573,75 +320,56 @@ local function applyStoredAvatar(avatarData)
             item.Parent = nil
         end
     end
-    
     for _, item in pairs(lp.Backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            table.insert(savedTools, item:Clone())
-        end
+        if item:IsA("Tool") then table.insert(savedTools, item:Clone()) end
     end
     
-    -- Hapus accessories & clothing
+    -- Hapus aksesoris & pakaian
     pcall(function()
-        for _, accessory in pairs(lp.Character:GetChildren()) do
-            if accessory:IsA("Accessory") then
-                accessory:Destroy()
-            end
-        end
-        
-        for _, clothing in pairs(lp.Character:GetChildren()) do
-            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
-                clothing:Destroy()
+        for _, acc in pairs(lp.Character:GetChildren()) do
+            if acc:IsA("Accessory") or acc:IsA("Shirt") or acc:IsA("Pants") or acc:IsA("ShirtGraphic") then
+                acc:Destroy()
             end
         end
     end)
     
-    wait(0.2)
+    wait(0.1)
     
-    -- Apply avatar
+    -- Apply
     local success = pcall(function()
         lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
     end)
-    
     if not success then
-        for _, tool in pairs(savedTools) do
-            tool.Parent = lp.Backpack
-        end
+        for _, t in pairs(savedTools) do t.Parent = lp.Backpack end
         return false, "Gagal apply avatar"
     end
     
-    wait(0.5)
+    wait(0.3)
     
     -- Restore tools
-    for _, tool in pairs(savedTools) do
-        if tool and tool:IsA("Tool") then
-            tool.Parent = lp.Backpack
-        end
+    for _, t in pairs(savedTools) do
+        if t and t.Parent == nil then t.Parent = lp.Backpack end
     end
-    
     if equippedTool then
         wait(0.1)
-        local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
-        if toolInBackpack then
-            lp.Character.Humanoid:EquipTool(toolInBackpack)
-        end
+        local tool = lp.Backpack:FindFirstChild(equippedTool.Name)
+        if tool then lp.Character.Humanoid:EquipTool(tool) end
     end
     
-    currentAvatarData = avatarData
+    lastAppliedUsername = username or "Preset"
+    lastAppliedDesc = lp.Character.Humanoid:GetAppliedDescription()
     
-    print("✅ Preset applied successfully!")
-    
-    return true, "Avatar loaded: " .. (avatarData.username or "Preset")
+    return true, "Avatar applied"
 end
 
--- Update Preset UI
+-- Update UI Preset
 local function updatePresetUI(presetButtons)
     for i = 1, 5 do
         local btn = presetButtons[i]
         local label = btn:FindFirstChild("Label")
-        
-        if presets[i] then
+        if presets[i] and presets[i].username then
             btn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-            label.Text = presets[i].username or "Preset"
+            label.Text = presets[i].username
             label.TextColor3 = Color3.fromRGB(255, 255, 255)
         else
             btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -651,252 +379,146 @@ local function updatePresetUI(presetButtons)
     end
 end
 
--- Animation Functions
-local function animateUI(frame, isOpening)
+-- Animasi UI
+local function animateUI(frame, open)
     if UIState.isAnimating then return end
     UIState.isAnimating = true
-    
-    local targetSize, targetVisible
-    if isOpening then
-        targetSize = UDim2.new(0, 380, 0, 240)
-        targetVisible = true
-        frame.Visible = true
-    else
-        targetSize = UDim2.new(0, 0, 0, 0)
-        targetVisible = false
-    end
-    
-    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    local sizeTween = TweenService:Create(frame, tweenInfo, {Size = targetSize})
-    
-    sizeTween:Play()
-    
-    if not isOpening then
-        sizeTween.Completed:Connect(function()
-            frame.Visible = false
-            UIState.isAnimating = false
-        end)
-    else
-        sizeTween.Completed:Connect(function()
-            UIState.isAnimating = false
-        end)
-    end
+    local target = open and UDim2.new(0, 380, 0, 240) or UDim2.new(0, 0, 0, 0)
+    frame.Visible = true
+    local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = target})
+    tween:Play()
+    tween.Completed:Connect(function()
+        if not open then frame.Visible = false end
+        UIState.isAnimating = false
+    end)
 end
 
 local function toggleUI(mainFrame, toggleButton)
     if UIState.isAnimating then return end
     UIState.isOpen = not UIState.isOpen
-    
-    if UIState.isOpen then
-        animateUI(mainFrame, true)
-        toggleButton.Text = "❌"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    else
-        animateUI(mainFrame, false)
-        toggleButton.Text = "🎮"
-        toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    end
+    animateUI(mainFrame, UIState.isOpen)
+    toggleButton.Text = UIState.isOpen and "X" or "Game"
+    toggleButton.BackgroundColor3 = UIState.isOpen and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(40, 40, 40)
 end
 
 local function makeDraggable(frame)
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    
+    local dragging, dragStart, startPos
     frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
         end
     end)
-    
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
 end
 
--- Main Script
+-- Main
 loadPresets()
-
 local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons = createUI()
-
 makeDraggable(ToggleButton)
 
-ToggleButton.MouseButton1Click:Connect(function()
-    toggleUI(MainFrame, ToggleButton)
-end)
+ToggleButton.MouseButton1Click:Connect(function() toggleUI(MainFrame, ToggleButton) end)
 
--- Hover Effects
+-- Hover Toggle
 ToggleButton.MouseEnter:Connect(function()
     if not UIState.isOpen then
-        local tween = TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
-            Size = UDim2.new(0, 40, 0, 40),
-            BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        })
-        tween:Play()
+        TweenService:Create(ToggleButton, TweenInfo.new(0.2), {Size = UDim2.new(0,40,0,40), BackgroundColor3 = Color3.fromRGB(60,60,60)}):Play()
     end
 end)
-
 ToggleButton.MouseLeave:Connect(function()
     if not UIState.isOpen then
-        local tween = TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
-            Size = UDim2.new(0, 35, 0, 35),
-            BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        })
-        tween:Play()
+        TweenService:Create(ToggleButton, TweenInfo.new(0.2), {Size = UDim2.new(0,35,0,35), BackgroundColor3 = Color3.fromRGB(40,40,40)}):Play()
     end
 end)
 
--- Submit Button
+-- Submit
 local function handleSubmit()
     local username = UsernameInput.Text
-    if username and username ~= "" then
+    if username ~= "" then
         UsernameInput.PlaceholderText = "Loading..."
         UsernameInput.Text = ""
-        StatusText.Text = "⏳ Applying & capturing avatar..."
+        StatusText.Text = "Applying..."
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
-        local success, message = loadAvatar(username)
-        
+        local success, msg = applyAvatar(username, nil)
         if success then
-            UsernameInput.PlaceholderText = "✓ Active: " .. username
-            StatusText.Text = "✅ Avatar Captured: " .. username
+            UsernameInput.PlaceholderText = "Active: " .. username
+            StatusText.Text = "Success: " .. username
             StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
-            UsernameInput.PlaceholderText = "✗ Failed"
-            StatusText.Text = "❌ " .. message
+            UsernameInput.PlaceholderText = "Failed"
+            StatusText.Text = msg
             StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-            
             wait(3)
             UsernameInput.PlaceholderText = "Enter username..."
-            StatusText.Text = "✨ Ready (Applied Capture Mode)"
+            StatusText.Text = "Ready (Tools Protected)"
             StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
     end
 end
-
 SubmitButton.MouseButton1Click:Connect(handleSubmit)
+UsernameInput.FocusLost:Connect(function(enter) if enter then handleSubmit() end end)
 
-UsernameInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        handleSubmit()
-    end
-end)
-
-SubmitButton.MouseEnter:Connect(function()
-    SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-end)
-
-SubmitButton.MouseLeave:Connect(function()
-    SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-end)
-
--- Preset Buttons Logic
+-- Preset Buttons
 for i, btn in ipairs(presetButtons) do
-    -- Left Click: Load preset
     btn.MouseButton1Click:Connect(function()
         if presets[i] then
-            StatusText.Text = "⏳ Loading Applied Preset " .. i .. "..."
+            StatusText.Text = "Loading Preset " .. i .. "..."
             StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
-            
-            local success, message = applyStoredAvatar(presets[i])
-            
-            if success then
-                StatusText.Text = "✅ Preset " .. i .. " loaded!"
-                StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-            else
-                StatusText.Text = "❌ Preset failed: " .. message
-                StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-            end
+            local success, msg = applyAvatar(presets[i].username, presets[i].desc)
+            StatusText.Text = success and "Preset " .. i .. " loaded!" or "Failed: " .. msg
+            StatusText.TextColor3 = success and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
         else
-            StatusText.Text = "⚠️ Preset " .. i .. " is empty!"
+            StatusText.Text = "Preset " .. i .. " kosong!"
             StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
         end
     end)
     
-    -- Right Click: Save APPLIED avatar (CAPTURE SAAT INI)
     btn.MouseButton2Click:Connect(function()
-        StatusText.Text = "📸 Capturing current avatar..."
-        StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
-        
-        wait(0.2)
-        
-        local capturedData = captureCurrentAvatar()
-        
-        if capturedData then
-            currentAvatarData = {
-                username = "Preset " .. i,
-                avatarData = capturedData
-            }
-            
-            presets[i] = currentAvatarData
+        if lastAppliedUsername and lastAppliedDesc then
+            presets[i] = {username = lastAppliedUsername, desc = getDescTable(lastAppliedDesc)}
             savePresets()
             updatePresetUI(presetButtons)
-            
-            StatusText.Text = "💾 Current Avatar saved to Preset " .. i .. "!"
+            StatusText.Text = "Saved to Preset " .. i .. "!"
             StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
-            StatusText.Text = "❌ Failed to capture avatar!"
-            StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
+            StatusText.Text = "Apply avatar dulu!"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
         end
     end)
     
-    -- Hover effect
-    btn.MouseEnter:Connect(function()
-        btn.Size = UDim2.new(0.19, 0, 0, 38)
-    end)
-    
-    btn.MouseLeave:Connect(function()
-        btn.Size = UDim2.new(0.18, 0, 0, 35)
-    end)
+    btn.MouseEnter:Connect(function() btn.Size = UDim2.new(0.19, 0, 0, 38) end)
+    btn.MouseLeave:Connect(function() btn.Size = UDim2.new(0.18, 0, 0, 35) end)
 end
 
 updatePresetUI(presetButtons)
 
--- AUTO REAPPLY ON RESPAWN
+-- Auto Reapply
 lp.CharacterAdded:Connect(function(char)
-    if currentAvatarData then
+    if lastAppliedUsername then
         char:WaitForChild("Humanoid")
-        wait(1.5)
-        
-        StatusText.Text = "🔄 Auto-reapplying avatar..."
+        wait(1)
+        StatusText.Text = "Reapplying: " .. lastAppliedUsername
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
-        
-        local success, message = applyStoredAvatar(currentAvatarData)
-        
-        if success then
-            StatusText.Text = "✅ Auto-applied: " .. (currentAvatarData.username or "Preset")
-            StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-        else
-            StatusText.Text = "❌ Auto-apply failed"
-            StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-        end
+        local descTable = lastAppliedDesc and getDescTable(lastAppliedDesc) or nil
+        local success, msg = applyAvatar(lastAppliedUsername, descTable)
+        StatusText.Text = success and "Auto-applied!" or "Failed"
+        StatusText.TextColor3 = success and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
     end
 end)
 
--- Keyboard Shortcut (F1)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F1 then
+-- F1 Toggle
+UserInputService.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.F1 then
         toggleUI(MainFrame, ToggleButton)
     end
 end)
-
-print("=== AVATAR CHANGER - APPLIED CAPTURE PRESET ===")
-print("✅ Menyimpan avatar yang SUDAH DI-APPLY")
-print("✅ Capture EXACT avatar yang sedang dipakai")
-print("✅ Right-Click preset = Capture & Save avatar saat ini")
-print("✅ Left-Click preset = Load saved avatar")
-print("✅ Auto load setelah rejoin/respawn")
-print("✅ Tekan F1 untuk toggle UI")
-print("===============================================")
