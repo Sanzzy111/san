@@ -1,6 +1,9 @@
--- AVATAR CHANGER - ADVANCED PRESET SYSTEM
--- Multi-avatar rotation | No rate limits | Cosmic theme
--- Persistent storage | Dynamic preset slots | Smart cooldown
+-- AVATAR CHANGER - FULL AVATAR PRESET SYSTEM
+-- ✅ 5 Preset Avatar dengan data lengkap (bukan username)
+-- ✅ Menyimpan seluruh HumanoidDescription
+-- ✅ Auto load preset setelah rejoin/ganti map
+-- ✅ Tools tidak hilang saat equip
+-- ✅ Compatible dengan Delta Executor Android
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -15,35 +18,130 @@ local UIState = {
     isAnimating = false
 }
 
-local lastAppliedUsername = nil
+local currentAvatarData = nil -- Menyimpan data avatar yang sedang aktif
 local presets = {}
-local avatarQueue = {}
-local currentAvatarIndex = 1
-local isRotating = false
-local rotationInterval = 30
-local lastRequestTime = 0
-local requestCooldown = 3
+local PRESET_FILE = "avatar_presets_full.json"
 
-local PRESET_FILE = "avatar_presets_v2.json"
+-- Fungsi untuk serialize HumanoidDescription ke table
+local function serializeHumanoidDescription(desc)
+    if not desc then return nil end
+    
+    local data = {
+        -- Body Colors
+        HeadColor = {desc.HeadColor.R, desc.HeadColor.G, desc.HeadColor.B},
+        TorsoColor = {desc.TorsoColor.R, desc.TorsoColor.G, desc.TorsoColor.B},
+        LeftArmColor = {desc.LeftArmColor.R, desc.LeftArmColor.G, desc.LeftArmColor.B},
+        RightArmColor = {desc.RightArmColor.R, desc.RightArmColor.G, desc.RightArmColor.B},
+        LeftLegColor = {desc.LeftLegColor.R, desc.LeftLegColor.G, desc.LeftLegColor.B},
+        RightLegColor = {desc.RightLegColor.R, desc.RightLegColor.G, desc.RightLegColor.B},
+        
+        -- Body Parts
+        Head = desc.Head,
+        Torso = desc.Torso,
+        LeftArm = desc.LeftArm,
+        RightArm = desc.RightArm,
+        LeftLeg = desc.LeftLeg,
+        RightLeg = desc.RightLeg,
+        
+        -- Scales
+        BodyTypeScale = desc.BodyTypeScale,
+        DepthScale = desc.DepthScale,
+        HeadScale = desc.HeadScale,
+        HeightScale = desc.HeightScale,
+        ProportionScale = desc.ProportionScale,
+        WidthScale = desc.WidthScale,
+        
+        -- Clothing & Accessories
+        Face = desc.Face,
+        Shirt = desc.Shirt,
+        Pants = desc.Pants,
+        GraphicTShirt = desc.GraphicTShirt,
+        
+        -- Accessories (semua slot)
+        BackAccessory = desc.BackAccessory,
+        FaceAccessory = desc.FaceAccessory,
+        FrontAccessory = desc.FrontAccessory,
+        HairAccessory = desc.HairAccessory,
+        HatAccessory = desc.HatAccessory,
+        NeckAccessory = desc.NeckAccessory,
+        ShouldersAccessory = desc.ShouldersAccessory,
+        WaistAccessory = desc.WaistAccessory,
+        
+        -- Emotes
+        ClimbAnimation = desc.ClimbAnimation,
+        FallAnimation = desc.FallAnimation,
+        IdleAnimation = desc.IdleAnimation,
+        JumpAnimation = desc.JumpAnimation,
+        RunAnimation = desc.RunAnimation,
+        SwimAnimation = desc.SwimAnimation,
+        WalkAnimation = desc.WalkAnimation,
+    }
+    
+    return data
+end
 
--- Cosmic Color Palette
-local CosmicTheme = {
-    background = Color3.fromRGB(15, 15, 25),
-    surface = Color3.fromRGB(25, 25, 40),
-    primary = Color3.fromRGB(138, 43, 226),
-    secondary = Color3.fromRGB(75, 0, 130),
-    accent = Color3.fromRGB(186, 85, 211),
-    success = Color3.fromRGB(0, 255, 127),
-    warning = Color3.fromRGB(255, 140, 0),
-    error = Color3.fromRGB(220, 20, 60),
-    text = Color3.fromRGB(230, 230, 240),
-    textDim = Color3.fromRGB(160, 160, 180)
-}
+-- Fungsi untuk deserialize table ke HumanoidDescription
+local function deserializeHumanoidDescription(data)
+    if not data then return nil end
+    
+    local desc = Instance.new("HumanoidDescription")
+    
+    -- Body Colors
+    desc.HeadColor = Color3.new(data.HeadColor[1], data.HeadColor[2], data.HeadColor[3])
+    desc.TorsoColor = Color3.new(data.TorsoColor[1], data.TorsoColor[2], data.TorsoColor[3])
+    desc.LeftArmColor = Color3.new(data.LeftArmColor[1], data.LeftArmColor[2], data.LeftArmColor[3])
+    desc.RightArmColor = Color3.new(data.RightArmColor[1], data.RightArmColor[2], data.RightArmColor[3])
+    desc.LeftLegColor = Color3.new(data.LeftLegColor[1], data.LeftLegColor[2], data.LeftLegColor[3])
+    desc.RightLegColor = Color3.new(data.RightLegColor[1], data.RightLegColor[2], data.RightLegColor[3])
+    
+    -- Body Parts
+    desc.Head = data.Head or 0
+    desc.Torso = data.Torso or 0
+    desc.LeftArm = data.LeftArm or 0
+    desc.RightArm = data.RightArm or 0
+    desc.LeftLeg = data.LeftLeg or 0
+    desc.RightLeg = data.RightLeg or 0
+    
+    -- Scales
+    desc.BodyTypeScale = data.BodyTypeScale or 0
+    desc.DepthScale = data.DepthScale or 1
+    desc.HeadScale = data.HeadScale or 1
+    desc.HeightScale = data.HeightScale or 1
+    desc.ProportionScale = data.ProportionScale or 0
+    desc.WidthScale = data.WidthScale or 1
+    
+    -- Clothing & Accessories
+    desc.Face = data.Face or 0
+    desc.Shirt = data.Shirt or 0
+    desc.Pants = data.Pants or 0
+    desc.GraphicTShirt = data.GraphicTShirt or 0
+    
+    -- Accessories
+    desc.BackAccessory = data.BackAccessory or ""
+    desc.FaceAccessory = data.FaceAccessory or ""
+    desc.FrontAccessory = data.FrontAccessory or ""
+    desc.HairAccessory = data.HairAccessory or ""
+    desc.HatAccessory = data.HatAccessory or ""
+    desc.NeckAccessory = data.NeckAccessory or ""
+    desc.ShouldersAccessory = data.ShouldersAccessory or ""
+    desc.WaistAccessory = data.WaistAccessory or ""
+    
+    -- Animations
+    desc.ClimbAnimation = data.ClimbAnimation or 0
+    desc.FallAnimation = data.FallAnimation or 0
+    desc.IdleAnimation = data.IdleAnimation or 0
+    desc.JumpAnimation = data.JumpAnimation or 0
+    desc.RunAnimation = data.RunAnimation or 0
+    desc.SwimAnimation = data.SwimAnimation or 0
+    desc.WalkAnimation = data.WalkAnimation or 0
+    
+    return desc
+end
 
--- Load presets
+-- Load presets dari file
 local function loadPresets()
     if not readfile or not isfile then 
-        warn("Executor does not support file operations")
+        warn("Executor tidak support file operations")
         return 
     end
     
@@ -54,15 +152,15 @@ local function loadPresets()
         
         if success and data then
             presets = data
-            print("Loaded " .. #presets .. " presets from file")
+            print("✅ Loaded " .. #presets .. " presets dari file")
         end
     end
 end
 
--- Save presets
+-- Save presets ke file
 local function savePresets()
     if not writefile then 
-        warn("Executor does not support file writing")
+        warn("Executor tidak support file writing")
         return 
     end
     
@@ -72,40 +170,35 @@ local function savePresets()
     end)
     
     if success then
-        print("Presets saved successfully")
+        print("✅ Presets saved to file")
     end
 end
 
--- Toggle Button
+-- Toggle Button Creation
 local function createToggleButton()
     local ToggleButton = Instance.new("TextButton")
     ToggleButton.Name = "ToggleButton"
-    ToggleButton.Size = UDim2.new(0, 40, 0, 40)
+    ToggleButton.Size = UDim2.new(0, 35, 0, 35)
     ToggleButton.Position = UDim2.new(0, 15, 0, 15)
-    ToggleButton.BackgroundColor3 = CosmicTheme.surface
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     ToggleButton.BorderSizePixel = 0
-    ToggleButton.Text = "A"
-    ToggleButton.TextColor3 = CosmicTheme.accent
-    ToggleButton.TextSize = 20
+    ToggleButton.Text = "🎮"
+    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.TextScaled = true
     ToggleButton.Font = Enum.Font.GothamBold
     ToggleButton.ZIndex = 10
     
     local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0.3, 0)
+    ToggleCorner.CornerRadius = UDim.new(1, 0)
     ToggleCorner.Parent = ToggleButton
-    
-    local ToggleStroke = Instance.new("UIStroke")
-    ToggleStroke.Color = CosmicTheme.primary
-    ToggleStroke.Thickness = 2
-    ToggleStroke.Parent = ToggleButton
     
     return ToggleButton
 end
 
--- Main UI Creation
+-- UI Creation dengan Preset Buttons
 local function createUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "AvatarChangerAdvanced"
+    ScreenGui.Name = "RobloxAccountLoader"
     ScreenGui.Parent = lp.PlayerGui
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -115,91 +208,70 @@ local function createUI()
     
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 420, 0, 480)
-    MainFrame.Position = UDim2.new(0.5, -210, 0.5, -240)
-    MainFrame.BackgroundColor3 = CosmicTheme.background
+    MainFrame.Size = UDim2.new(0, 380, 0, 240)
+    MainFrame.Position = UDim2.new(0.5, -190, 0.05, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = false
     
     local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 16)
+    MainCorner.CornerRadius = UDim.new(0, 12)
     MainCorner.Parent = MainFrame
     
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Color = CosmicTheme.primary
-    MainStroke.Thickness = 2
-    MainStroke.Parent = MainFrame
-    
-    -- Title Bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 40)
-    TitleBar.BackgroundColor3 = CosmicTheme.surface
+    TitleBar.Size = UDim2.new(1, 0, 0, 30)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = MainFrame
     
     local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 16)
+    TitleCorner.CornerRadius = UDim.new(0, 12)
     TitleCorner.Parent = TitleBar
-    
-    local TitleCover = Instance.new("Frame")
-    TitleCover.Size = UDim2.new(1, 0, 0, 20)
-    TitleCover.Position = UDim2.new(0, 0, 1, -20)
-    TitleCover.BackgroundColor3 = CosmicTheme.surface
-    TitleCover.BorderSizePixel = 0
-    TitleCover.Parent = TitleBar
     
     local TitleText = Instance.new("TextLabel")
     TitleText.Size = UDim2.new(1, -20, 1, 0)
     TitleText.Position = UDim2.new(0, 10, 0, 0)
     TitleText.BackgroundTransparency = 1
-    TitleText.Text = "AVATAR CHANGER ADVANCED"
-    TitleText.TextColor3 = CosmicTheme.accent
-    TitleText.TextSize = 16
+    TitleText.Text = "🎮 AVATAR CHANGER (FULL DATA)"
+    TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleText.TextScaled = true
     TitleText.Font = Enum.Font.GothamBold
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     TitleText.Parent = TitleBar
     
-    -- Input Section
     local InputFrame = Instance.new("Frame")
-    InputFrame.Size = UDim2.new(1, -20, 0, 40)
-    InputFrame.Position = UDim2.new(0, 10, 0, 50)
+    InputFrame.Size = UDim2.new(1, -20, 0, 35)
+    InputFrame.Position = UDim2.new(0, 10, 0, 35)
     InputFrame.BackgroundTransparency = 1
     InputFrame.Parent = MainFrame
     
     local UsernameInput = Instance.new("TextBox")
     UsernameInput.Name = "UsernameInput"
-    UsernameInput.Size = UDim2.new(0.65, -5, 1, 0)
-    UsernameInput.BackgroundColor3 = CosmicTheme.surface
+    UsernameInput.Size = UDim2.new(0.7, -5, 1, 0)
+    UsernameInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     UsernameInput.BorderSizePixel = 0
     UsernameInput.Text = ""
-    UsernameInput.PlaceholderText = "Enter username"
-    UsernameInput.PlaceholderColor3 = CosmicTheme.textDim
-    UsernameInput.TextColor3 = CosmicTheme.text
-    UsernameInput.TextSize = 14
+    UsernameInput.PlaceholderText = "Enter username..."
+    UsernameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UsernameInput.TextScaled = true
     UsernameInput.Font = Enum.Font.Gotham
     UsernameInput.Parent = InputFrame
     
-    local InputCorner = Instance.new("UICorner")
-    InputCorner.CornerRadius = UDim.new(0, 8)
-    InputCorner.Parent = UsernameInput
-    
-    local InputStroke = Instance.new("UIStroke")
-    InputStroke.Color = CosmicTheme.primary
-    InputStroke.Thickness = 1
-    InputStroke.Transparency = 0.5
-    InputStroke.Parent = UsernameInput
+    local UsernameCorner = Instance.new("UICorner")
+    UsernameCorner.CornerRadius = UDim.new(0, 8)
+    UsernameCorner.Parent = UsernameInput
     
     local SubmitButton = Instance.new("TextButton")
     SubmitButton.Name = "SubmitButton"
-    SubmitButton.Size = UDim2.new(0.35, -5, 1, 0)
-    SubmitButton.Position = UDim2.new(0.65, 0, 0, 0)
-    SubmitButton.BackgroundColor3 = CosmicTheme.primary
+    SubmitButton.Size = UDim2.new(0.3, -5, 1, 0)
+    SubmitButton.Position = UDim2.new(0.7, 0, 0, 0)
+    SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
     SubmitButton.BorderSizePixel = 0
-    SubmitButton.Text = "APPLY"
-    SubmitButton.TextColor3 = CosmicTheme.text
-    SubmitButton.TextSize = 14
+    SubmitButton.Text = "SUBMIT"
+    SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SubmitButton.TextScaled = true
     SubmitButton.Font = Enum.Font.GothamBold
     SubmitButton.Parent = InputFrame
     
@@ -207,113 +279,64 @@ local function createUI()
     SubmitCorner.CornerRadius = UDim.new(0, 8)
     SubmitCorner.Parent = SubmitButton
     
-    -- Preset Section
-    local PresetFrame = Instance.new("ScrollingFrame")
-    PresetFrame.Name = "PresetFrame"
-    PresetFrame.Size = UDim2.new(1, -20, 0, 280)
-    PresetFrame.Position = UDim2.new(0, 10, 0, 100)
-    PresetFrame.BackgroundColor3 = CosmicTheme.surface
+    -- PRESET SECTION
+    local PresetFrame = Instance.new("Frame")
+    PresetFrame.Size = UDim2.new(1, -20, 0, 120)
+    PresetFrame.Position = UDim2.new(0, 10, 0, 75)
+    PresetFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     PresetFrame.BorderSizePixel = 0
-    PresetFrame.ScrollBarThickness = 6
-    PresetFrame.ScrollBarImageColor3 = CosmicTheme.primary
-    PresetFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    PresetFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     PresetFrame.Parent = MainFrame
     
     local PresetCorner = Instance.new("UICorner")
-    PresetCorner.CornerRadius = UDim.new(0, 12)
+    PresetCorner.CornerRadius = UDim.new(0, 8)
     PresetCorner.Parent = PresetFrame
     
     local PresetTitle = Instance.new("TextLabel")
-    PresetTitle.Size = UDim2.new(1, -10, 0, 30)
-    PresetTitle.Position = UDim2.new(0, 5, 0, 5)
+    PresetTitle.Size = UDim2.new(1, 0, 0, 20)
     PresetTitle.BackgroundTransparency = 1
-    PresetTitle.Text = "PRESET SLOTS"
-    PresetTitle.TextColor3 = CosmicTheme.accent
-    PresetTitle.TextSize = 14
+    PresetTitle.Text = "⭐ PRESETS (Right-Click to Save Full Avatar)"
+    PresetTitle.TextColor3 = Color3.fromRGB(255, 200, 0)
+    PresetTitle.TextScaled = true
     PresetTitle.Font = Enum.Font.GothamBold
-    PresetTitle.TextXAlignment = Enum.TextXAlignment.Left
     PresetTitle.Parent = PresetFrame
     
-    local PresetList = Instance.new("UIListLayout")
-    PresetList.Padding = UDim.new(0, 8)
-    PresetList.SortOrder = Enum.SortOrder.LayoutOrder
-    PresetList.Parent = PresetFrame
+    -- 5 Preset Buttons
+    local presetButtons = {}
+    for i = 1, 5 do
+        local btn = Instance.new("TextButton")
+        btn.Name = "Preset" .. i
+        btn.Size = UDim2.new(0.18, 0, 0, 35)
+        btn.Position = UDim2.new((i-1) * 0.2 + 0.01, 0, 0, 25)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        btn.BorderSizePixel = 0
+        btn.Text = tostring(i)
+        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        btn.TextScaled = true
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = PresetFrame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Size = UDim2.new(1, 0, 0, 15)
+        label.Position = UDim2.new(0, 0, 1, 2)
+        label.BackgroundTransparency = 1
+        label.Text = "Empty"
+        label.TextColor3 = Color3.fromRGB(150, 150, 150)
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        label.Parent = btn
+        
+        presetButtons[i] = btn
+    end
     
-    local PresetPadding = Instance.new("UIPadding")
-    PresetPadding.PaddingTop = UDim.new(0, 40)
-    PresetPadding.PaddingLeft = UDim.new(0, 10)
-    PresetPadding.PaddingRight = UDim.new(0, 10)
-    PresetPadding.PaddingBottom = UDim.new(0, 10)
-    PresetPadding.Parent = PresetFrame
-    
-    -- Add Preset Button
-    local AddPresetBtn = Instance.new("TextButton")
-    AddPresetBtn.Name = "AddPresetButton"
-    AddPresetBtn.Size = UDim2.new(1, -20, 0, 35)
-    AddPresetBtn.BackgroundColor3 = CosmicTheme.secondary
-    AddPresetBtn.BorderSizePixel = 0
-    AddPresetBtn.Text = "+"
-    AddPresetBtn.TextColor3 = CosmicTheme.text
-    AddPresetBtn.TextSize = 20
-    AddPresetBtn.Font = Enum.Font.GothamBold
-    AddPresetBtn.LayoutOrder = 999999
-    AddPresetBtn.Parent = PresetFrame
-    
-    local AddPresetCorner = Instance.new("UICorner")
-    AddPresetCorner.CornerRadius = UDim.new(0, 8)
-    AddPresetCorner.Parent = AddPresetBtn
-    
-    -- Rotation Control
-    local RotationFrame = Instance.new("Frame")
-    RotationFrame.Size = UDim2.new(1, -20, 0, 50)
-    RotationFrame.Position = UDim2.new(0, 10, 0, 390)
-    RotationFrame.BackgroundColor3 = CosmicTheme.surface
-    RotationFrame.BorderSizePixel = 0
-    RotationFrame.Parent = MainFrame
-    
-    local RotationCorner = Instance.new("UICorner")
-    RotationCorner.CornerRadius = UDim.new(0, 8)
-    RotationCorner.Parent = RotationFrame
-    
-    local RotationToggle = Instance.new("TextButton")
-    RotationToggle.Name = "RotationToggle"
-    RotationToggle.Size = UDim2.new(0.6, -5, 1, -10)
-    RotationToggle.Position = UDim2.new(0, 5, 0, 5)
-    RotationToggle.BackgroundColor3 = CosmicTheme.secondary
-    RotationToggle.BorderSizePixel = 0
-    RotationToggle.Text = "AUTO ROTATE: OFF"
-    RotationToggle.TextColor3 = CosmicTheme.text
-    RotationToggle.TextSize = 12
-    RotationToggle.Font = Enum.Font.GothamBold
-    RotationToggle.Parent = RotationFrame
-    
-    local RotToggleCorner = Instance.new("UICorner")
-    RotToggleCorner.CornerRadius = UDim.new(0, 6)
-    RotToggleCorner.Parent = RotationToggle
-    
-    local IntervalInput = Instance.new("TextBox")
-    IntervalInput.Name = "IntervalInput"
-    IntervalInput.Size = UDim2.new(0.4, -10, 1, -10)
-    IntervalInput.Position = UDim2.new(0.6, 5, 0, 5)
-    IntervalInput.BackgroundColor3 = CosmicTheme.background
-    IntervalInput.BorderSizePixel = 0
-    IntervalInput.Text = "30"
-    IntervalInput.PlaceholderText = "Seconds"
-    IntervalInput.TextColor3 = CosmicTheme.text
-    IntervalInput.TextSize = 12
-    IntervalInput.Font = Enum.Font.Gotham
-    IntervalInput.Parent = RotationFrame
-    
-    local IntervalCorner = Instance.new("UICorner")
-    IntervalCorner.CornerRadius = UDim.new(0, 6)
-    IntervalCorner.Parent = IntervalInput
-    
-    -- Status Bar
     local StatusFrame = Instance.new("Frame")
-    StatusFrame.Size = UDim2.new(1, -20, 0, 35)
-    StatusFrame.Position = UDim2.new(0, 10, 0, 450)
-    StatusFrame.BackgroundColor3 = CosmicTheme.surface
+    StatusFrame.Size = UDim2.new(1, -20, 0, 40)
+    StatusFrame.Position = UDim2.new(0, 10, 0, 200)
+    StatusFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     StatusFrame.BorderSizePixel = 0
     StatusFrame.Parent = MainFrame
     
@@ -326,40 +349,28 @@ local function createUI()
     StatusText.Size = UDim2.new(1, -10, 1, 0)
     StatusText.Position = UDim2.new(0, 5, 0, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "Ready | Tools Protected"
-    StatusText.TextColor3 = CosmicTheme.textDim
-    StatusText.TextSize = 12
-    StatusText.Font = Enum.Font.Gotham
+    StatusText.Text = "✨ Ready (Full Avatar System)"
+    StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    StatusText.TextScaled = true
+    StatusText.Font = Enum.Font.GothamBold
     StatusText.TextXAlignment = Enum.TextXAlignment.Center
     StatusText.Parent = StatusFrame
     
-    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, PresetFrame, AddPresetBtn, RotationToggle, IntervalInput
+    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons
 end
 
--- Load Avatar with Smart Cooldown
-local function loadAvatar(username)
+-- Load Avatar dari Username
+local function loadAvatarFromUsername(username)
     if not username or username == "" then
-        return false, "Username cannot be empty"
+        return false, "Username tidak boleh kosong!", nil
     end
-    
-    local currentTime = tick()
-    if currentTime - lastRequestTime < requestCooldown then
-        local waitTime = requestCooldown - (currentTime - lastRequestTime)
-        wait(waitTime)
-    end
-    
-    lastRequestTime = tick()
     
     local success, userId = pcall(function()
         return Players:GetUserIdFromNameAsync(username)
     end)
     
     if not success then
-        return false, "Username not found: " .. username
-    end
-    
-    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
-        return false, "Character not available"
+        return false, "Username tidak ditemukan: " .. username, nil
     end
     
     local humanoidDesc
@@ -368,10 +379,23 @@ local function loadAvatar(username)
     end)
     
     if not success2 or not humanoidDesc then
-        return false, "Failed to get avatar data"
+        return false, "Gagal mendapatkan avatar", nil
     end
     
-    -- Save tools
+    -- Serialize avatar data
+    local avatarData = serializeHumanoidDescription(humanoidDesc)
+    avatarData.username = username -- Simpan username untuk label
+    
+    return true, "Avatar loaded: " .. username, avatarData, humanoidDesc
+end
+
+-- Apply Avatar dari HumanoidDescription
+local function applyAvatar(humanoidDesc)
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character tidak ada!"
+    end
+    
+    -- Simpan tools
     local savedTools = {}
     local equippedTool = nil
     
@@ -389,7 +413,7 @@ local function loadAvatar(username)
         end
     end
     
-    -- Remove current avatar items
+    -- Hapus accessories & clothing
     pcall(function()
         for _, accessory in pairs(lp.Character:GetChildren()) do
             if accessory:IsA("Accessory") then
@@ -407,15 +431,15 @@ local function loadAvatar(username)
     wait(0.1)
     
     -- Apply avatar
-    local success3 = pcall(function()
+    local success = pcall(function()
         lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
     end)
     
-    if not success3 then
+    if not success then
         for _, tool in pairs(savedTools) do
             tool.Parent = lp.Backpack
         end
-        return false, "Failed to apply avatar"
+        return false, "Gagal apply avatar"
     end
     
     wait(0.3)
@@ -435,102 +459,24 @@ local function loadAvatar(username)
         end
     end
     
-    return true, "Avatar applied: " .. username
+    return true, "Avatar applied successfully!"
 end
 
--- Create Preset Button
-local function createPresetButton(index, username, parent)
-    local btn = Instance.new("TextButton")
-    btn.Name = "Preset" .. index
-    btn.Size = UDim2.new(1, -20, 0, 40)
-    btn.BackgroundColor3 = CosmicTheme.secondary
-    btn.BorderSizePixel = 0
-    btn.Text = ""
-    btn.LayoutOrder = index
-    btn.Parent = parent
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = btn
-    
-    local label = Instance.new("TextLabel")
-    label.Name = "Label"
-    label.Size = UDim2.new(1, -50, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = username or "Empty Slot"
-    label.TextColor3 = username and CosmicTheme.text or CosmicTheme.textDim
-    label.TextSize = 13
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextTruncate = Enum.TextTruncate.AtEnd
-    label.Parent = btn
-    
-    local deleteBtn = Instance.new("TextButton")
-    deleteBtn.Name = "DeleteButton"
-    deleteBtn.Size = UDim2.new(0, 30, 0, 30)
-    deleteBtn.Position = UDim2.new(1, -35, 0.5, -15)
-    deleteBtn.BackgroundColor3 = CosmicTheme.error
-    deleteBtn.BorderSizePixel = 0
-    deleteBtn.Text = "X"
-    deleteBtn.TextColor3 = CosmicTheme.text
-    deleteBtn.TextSize = 14
-    deleteBtn.Font = Enum.Font.GothamBold
-    deleteBtn.Parent = btn
-    
-    local deleteCorner = Instance.new("UICorner")
-    deleteCorner.CornerRadius = UDim.new(0, 6)
-    deleteCorner.Parent = deleteBtn
-    
-    return btn, label, deleteBtn
-end
-
--- Update All Presets UI
-local function updatePresetsUI(presetFrame)
-    for _, child in pairs(presetFrame:GetChildren()) do
-        if child:IsA("TextButton") and child.Name ~= "AddPresetButton" then
-            child:Destroy()
+-- Update Preset UI
+local function updatePresetUI(presetButtons)
+    for i = 1, 5 do
+        local btn = presetButtons[i]
+        local label = btn:FindFirstChild("Label")
+        
+        if presets[i] and presets[i].username then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+            label.Text = presets[i].username
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            label.Text = "Empty"
+            label.TextColor3 = Color3.fromRGB(150, 150, 150)
         end
-    end
-    
-    for i, username in ipairs(presets) do
-        local btn, label, deleteBtn = createPresetButton(i, username, presetFrame)
-        
-        -- Load preset
-        btn.MouseButton1Click:Connect(function()
-            if username then
-                local success, message = loadAvatar(username)
-                if success then
-                    lastAppliedUsername = username
-                end
-            end
-        end)
-        
-        -- Save current avatar
-        btn.MouseButton2Click:Connect(function()
-            if lastAppliedUsername then
-                presets[i] = lastAppliedUsername
-                savePresets()
-                label.Text = lastAppliedUsername
-                label.TextColor3 = CosmicTheme.text
-            end
-        end)
-        
-        -- Delete preset
-        deleteBtn.MouseButton1Click:Connect(function()
-            table.remove(presets, i)
-            savePresets()
-            updatePresetsUI(presetFrame)
-        end)
-        
-        -- Hover effects
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.primary}):Play()
-        end)
-        
-        btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.secondary}):Play()
-        end)
     end
 end
 
@@ -539,23 +485,28 @@ local function animateUI(frame, isOpening)
     if UIState.isAnimating then return end
     UIState.isAnimating = true
     
+    local targetSize, targetVisible
     if isOpening then
+        targetSize = UDim2.new(0, 380, 0, 240)
+        targetVisible = true
         frame.Visible = true
-        frame.Size = UDim2.new(0, 0, 0, 0)
-        local tween = TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 420, 0, 480)
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
+    else
+        targetSize = UDim2.new(0, 0, 0, 0)
+        targetVisible = false
+    end
+    
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local sizeTween = TweenService:Create(frame, tweenInfo, {Size = targetSize})
+    
+    sizeTween:Play()
+    
+    if not isOpening then
+        sizeTween.Completed:Connect(function()
+            frame.Visible = false
             UIState.isAnimating = false
         end)
     else
-        local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0)
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
-            frame.Visible = false
+        sizeTween.Completed:Connect(function()
             UIState.isAnimating = false
         end)
     end
@@ -567,12 +518,12 @@ local function toggleUI(mainFrame, toggleButton)
     
     if UIState.isOpen then
         animateUI(mainFrame, true)
-        toggleButton.Text = "X"
-        toggleButton.BackgroundColor3 = CosmicTheme.error
+        toggleButton.Text = "❌"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
     else
         animateUI(mainFrame, false)
-        toggleButton.Text = "A"
-        toggleButton.BackgroundColor3 = CosmicTheme.surface
+        toggleButton.Text = "🎮"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     end
 end
 
@@ -603,77 +554,35 @@ local function makeDraggable(frame)
     end)
 end
 
--- Auto Rotation System
-local function startRotation(statusText)
-    isRotating = true
-    
-    spawn(function()
-        while isRotating do
-            if #presets > 0 then
-                local username = presets[currentAvatarIndex]
-                if username then
-                    statusText.Text = "Rotating to: " .. username
-                    statusText.TextColor3 = CosmicTheme.warning
-                    
-                    local success, message = loadAvatar(username)
-                    
-                    if success then
-                        lastAppliedUsername = username
-                        statusText.Text = "Active: " .. username
-                        statusText.TextColor3 = CosmicTheme.success
-                    else
-                        statusText.Text = "Failed: " .. message
-                        statusText.TextColor3 = CosmicTheme.error
-                    end
-                    
-                    currentAvatarIndex = currentAvatarIndex + 1
-                    if currentAvatarIndex > #presets then
-                        currentAvatarIndex = 1
-                    end
-                end
-            end
-            
-            wait(rotationInterval)
-        end
-    end)
-end
-
-local function stopRotation(statusText)
-    isRotating = false
-    statusText.Text = "Rotation stopped"
-    statusText.TextColor3 = CosmicTheme.textDim
-end
-
 -- Main Script
 loadPresets()
 
-local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, PresetFrame, AddPresetBtn, RotationToggle, IntervalInput = createUI()
+local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons = createUI()
 
 makeDraggable(ToggleButton)
-makeDraggable(MainFrame:FindFirstChild("TitleBar"))
 
-updatePresetsUI(PresetFrame)
-
--- Toggle Button
 ToggleButton.MouseButton1Click:Connect(function()
     toggleUI(MainFrame, ToggleButton)
 end)
 
+-- Hover Effects
 ToggleButton.MouseEnter:Connect(function()
     if not UIState.isOpen then
-        TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
-            Size = UDim2.new(0, 45, 0, 45),
-            BackgroundColor3 = CosmicTheme.primary
-        }):Play()
+        local tween = TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 40, 0, 40),
+            BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        })
+        tween:Play()
     end
 end)
 
 ToggleButton.MouseLeave:Connect(function()
     if not UIState.isOpen then
-        TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
-            Size = UDim2.new(0, 40, 0, 40),
-            BackgroundColor3 = CosmicTheme.surface
-        }):Play()
+        local tween = TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 35, 0, 35),
+            BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        })
+        tween:Play()
     end
 end)
 
@@ -681,463 +590,153 @@ end)
 local function handleSubmit()
     local username = UsernameInput.Text
     if username and username ~= "" then
+        UsernameInput.PlaceholderText = "Loading..."
         UsernameInput.Text = ""
-        StatusText.Text = "Applying avatar..."
-        StatusText.TextColor3 = CosmicTheme.warning
+        StatusText.Text = "⏳ Loading avatar data..."
+        StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
-        local success, message = loadAvatar(username)
+        local success, message, avatarData, humanoidDesc = loadAvatarFromUsername(username)
         
         if success then
-            lastAppliedUsername = username
-            StatusText.Text = "Active: " .. username
-            StatusText.TextColor3 = CosmicTheme.success
+            local applySuccess, applyMessage = applyAvatar(humanoidDesc)
+            
+            if applySuccess then
+                currentAvatarData = avatarData
+                UsernameInput.PlaceholderText = "✓ Active: " .. username
+                StatusText.Text = "✅ Avatar Applied: " .. username
+                StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
+            else
+                UsernameInput.PlaceholderText = "✗ Apply Failed"
+                StatusText.Text = "❌ " .. applyMessage
+                StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
+            end
         else
-            StatusText.Text = message
-            StatusText.TextColor3 = CosmicTheme.error
+            UsernameInput.PlaceholderText = "✗ Failed"
+            StatusText.Text = "❌ " .. message
+            StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
             
             wait(3)
-            StatusText.Text = "Ready | Tools Protected"
-            StatusText.TextColor3 = CosmicTheme.textDim
+            UsernameInput.PlaceholderText = "Enter username..."
+            StatusText.Text = "✨ Ready (Full Avatar System)"
+            StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
     end
 end
 
 SubmitButton.MouseButton1Click:Connect(handleSubmit)
+
 UsernameInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed then handleSubmit() end
-end)
-
--- Add Preset Button
-AddPresetBtn.MouseButton1Click:Connect(function()
-    if lastAppliedUsername then
-        table.insert(presets, lastAppliedUsername)
-        savePresets()
-        updatePresetsUI(PresetFrame)
-        StatusText.Text = "Preset added: " .. lastAppliedUsername
-        StatusText.TextColor3 = CosmicTheme.success
-    else
-        StatusText.Text = "Apply an avatar first"
-        StatusText.TextColor3 = CosmicTheme.warning
+    if enterPressed then
+        handleSubmit()
     end
 end)
 
--- Rotation Toggle
-RotationToggle.MouseButton1Click:Connect(function()
-    if isRotating then
-        stopRotation(StatusText)
-        RotationToggle.Text = "AUTO ROTATE: OFF"
-        RotationToggle.BackgroundColor3 = CosmicTheme.secondary
-    else
-        if #presets > 0 then
-            local interval = tonumber(IntervalInput.Text)
-            if interval and interval >= 5 then
-                rotationInterval = interval
-                startRotation(StatusText)
-                RotationToggle.Text = "AUTO ROTATE: ON"
-                RotationToggle.BackgroundColor3 = CosmicTheme.success
-            else
-                StatusText.Text = "Interval minimum 5 seconds"
-                StatusText.TextColor3 = CosmicTheme.error
-            end
-        else
-            StatusText.Text = "Add presets first"
-            StatusText.TextColor3 = CosmicTheme.warning
-        end
-    end
-end)
-
--- Interval Input Validation
-IntervalInput.FocusLost:Connect(function()
-    local value = tonumber(IntervalInput.Text)
-    if not value or value < 5 then
-        IntervalInput.Text = "30"
-    end
-end)
-
--- Hover Effects
 SubmitButton.MouseEnter:Connect(function()
-    TweenService:Create(SubmitButton, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.accent}):Play()
+    SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
 end)
 
 SubmitButton.MouseLeave:Connect(function()
-    TweenService:Create(SubmitButton, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.primary}):Play()
+    SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 end)
 
-AddPresetBtn.MouseEnter:Connect(function()
-    TweenService:Create(AddPresetBtn, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.primary}):Play()
-end)
-
-AddPresetBtn.MouseLeave:Connect(function()
-    TweenService:Create(AddPresetBtn, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.secondary}):Play()
-end)
-
-RotationToggle.MouseEnter:Connect(function()
-    if not isRotating then
-        TweenService:Create(RotationToggle, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.primary}):Play()
-    end
-end)
-
-RotationToggle.MouseLeave:Connect(function()
-    if not isRotating then
-        TweenService:Create(RotationToggle, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.secondary}):Play()
-    end
-end)
-
--- Input Focus Effects
-UsernameInput.Focused:Connect(function()
-    local stroke = UsernameInput:FindFirstChild("UIStroke")
-    if stroke then
-        TweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0, Thickness = 2}):Play()
-    end
-end)
-
-UsernameInput.FocusLost:Connect(function()
-    local stroke = UsernameInput:FindFirstChild("UIStroke")
-    if stroke then
-        TweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0.5, Thickness = 1}):Play()
-    end
-end)
-
--- Auto Reapply on Respawn
-lp.CharacterAdded:Connect(function(char)
-    if lastAppliedUsername then
-        char:WaitForChild("Humanoid")
-        wait(1.5)
-        
-        StatusText.Text = "Auto-reapplying: " .. lastAppliedUsername
-        StatusText.TextColor3 = CosmicTheme.warning
-        
-        local success, message = loadAvatar(lastAppliedUsername)
-        
-        if success then
-            StatusText.Text = "Active: " .. lastAppliedUsername
-            StatusText.TextColor3 = CosmicTheme.success
-        else
-            StatusText.Text = "Auto-apply failed"
-            StatusText.TextColor3 = CosmicTheme.error
-        end
-    end
-end)
-
--- Keyboard Shortcuts
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- F1: Toggle UI
-    if input.KeyCode == Enum.KeyCode.F1 then
-        toggleUI(MainFrame, ToggleButton)
-    end
-    
-    -- F2: Quick Apply from Input
-    if input.KeyCode == Enum.KeyCode.F2 then
-        handleSubmit()
-    end
-    
-    -- F3: Toggle Rotation
-    if input.KeyCode == Enum.KeyCode.F3 then
-        RotationToggle.MouseButton1Click:Fire()
-    end
-    
-    -- Number Keys 1-9: Quick Load Presets
-    local keyCodeToNumber = {
-        [Enum.KeyCode.One] = 1,
-        [Enum.KeyCode.Two] = 2,
-        [Enum.KeyCode.Three] = 3,
-        [Enum.KeyCode.Four] = 4,
-        [Enum.KeyCode.Five] = 5,
-        [Enum.KeyCode.Six] = 6,
-        [Enum.KeyCode.Seven] = 7,
-        [Enum.KeyCode.Eight] = 8,
-        [Enum.KeyCode.Nine] = 9
-    }
-    
-    local presetIndex = keyCodeToNumber[input.KeyCode]
-    if presetIndex and presets[presetIndex] then
-        StatusText.Text = "Quick loading preset " .. presetIndex
-        StatusText.TextColor3 = CosmicTheme.warning
-        
-        local success, message = loadAvatar(presets[presetIndex])
-        
-        if success then
-            lastAppliedUsername = presets[presetIndex]
-            StatusText.Text = "Active: " .. presets[presetIndex]
-            StatusText.TextColor3 = CosmicTheme.success
-        else
-            StatusText.Text = message
-            StatusText.TextColor3 = CosmicTheme.error
-        end
-    end
-end)
-
--- Export/Import Functions
-local function exportPresets()
-    if #presets == 0 then
-        StatusText.Text = "No presets to export"
-        StatusText.TextColor3 = CosmicTheme.warning
-        return
-    end
-    
-    local exportData = table.concat(presets, ",")
-    
-    if setclipboard then
-        setclipboard(exportData)
-        StatusText.Text = "Presets copied to clipboard"
-        StatusText.TextColor3 = CosmicTheme.success
-    else
-        StatusText.Text = "Clipboard not supported"
-        StatusText.TextColor3 = CosmicTheme.error
-    end
-end
-
-local function importPresets(data)
-    if not data or data == "" then
-        StatusText.Text = "No data to import"
-        StatusText.TextColor3 = CosmicTheme.warning
-        return
-    end
-    
-    local importedPresets = {}
-    for username in string.gmatch(data, "([^,]+)") do
-        local trimmed = username:match("^%s*(.-)%s*$")
-        if trimmed ~= "" then
-            table.insert(importedPresets, trimmed)
-        end
-    end
-    
-    if #importedPresets > 0 then
-        for _, username in ipairs(importedPresets) do
-            table.insert(presets, username)
-        end
-        savePresets()
-        updatePresetsUI(PresetFrame)
-        StatusText.Text = "Imported " .. #importedPresets .. " presets"
-        StatusText.TextColor3 = CosmicTheme.success
-    else
-        StatusText.Text = "Invalid import data"
-        StatusText.TextColor3 = CosmicTheme.error
-    end
-end
-
--- Context Menu for Advanced Options
-local ContextMenu = Instance.new("Frame")
-ContextMenu.Name = "ContextMenu"
-ContextMenu.Size = UDim2.new(0, 180, 0, 140)
-ContextMenu.BackgroundColor3 = CosmicTheme.surface
-ContextMenu.BorderSizePixel = 0
-ContextMenu.Visible = false
-ContextMenu.ZIndex = 100
-ContextMenu.Parent = ScreenGui
-
-local ContextCorner = Instance.new("UICorner")
-ContextCorner.CornerRadius = UDim.new(0, 8)
-ContextCorner.Parent = ContextMenu
-
-local ContextStroke = Instance.new("UIStroke")
-ContextStroke.Color = CosmicTheme.primary
-ContextStroke.Thickness = 2
-ContextStroke.Parent = ContextMenu
-
-local ContextList = Instance.new("UIListLayout")
-ContextList.Padding = UDim.new(0, 5)
-ContextList.SortOrder = Enum.SortOrder.LayoutOrder
-ContextList.Parent = ContextMenu
-
-local ContextPadding = Instance.new("UIPadding")
-ContextPadding.PaddingTop = UDim.new(0, 5)
-ContextPadding.PaddingLeft = UDim.new(0, 5)
-ContextPadding.PaddingRight = UDim.new(0, 5)
-ContextPadding.PaddingBottom = UDim.new(0, 5)
-ContextPadding.Parent = ContextMenu
-
-local function createContextButton(text, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 30)
-    btn.BackgroundColor3 = CosmicTheme.background
-    btn.BorderSizePixel = 0
-    btn.Text = text
-    btn.TextColor3 = CosmicTheme.text
-    btn.TextSize = 12
-    btn.Font = Enum.Font.Gotham
-    btn.Parent = ContextMenu
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-    
+-- Preset Buttons Logic
+for i, btn in ipairs(presetButtons) do
+    -- Left Click: Load preset
     btn.MouseButton1Click:Connect(function()
-        callback()
-        ContextMenu.Visible = false
+        if presets[i] then
+            StatusText.Text = "⏳ Loading Preset " .. i .. "..."
+            StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
+            
+            local humanoidDesc = deserializeHumanoidDescription(presets[i])
+            if humanoidDesc then
+                local success, message = applyAvatar(humanoidDesc)
+                
+                if success then
+                    currentAvatarData = presets[i]
+                    StatusText.Text = "✅ Preset " .. i .. " loaded!"
+                    StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
+                else
+                    StatusText.Text = "❌ Failed: " .. message
+                    StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
+                end
+            else
+                StatusText.Text = "❌ Preset data corrupted!"
+                StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
+            end
+        else
+            StatusText.Text = "⚠️ Preset " .. i .. " is empty!"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
+        end
     end)
     
+    -- Right Click: Save current avatar
+    btn.MouseButton2Click:Connect(function()
+        if currentAvatarData then
+            presets[i] = currentAvatarData
+            savePresets()
+            updatePresetUI(presetButtons)
+            
+            StatusText.Text = "💾 Full Avatar saved to Preset " .. i .. "!"
+            StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
+        else
+            StatusText.Text = "⚠️ Apply avatar first!"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
+        end
+    end)
+    
+    -- Hover effect
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.primary}):Play()
+        btn.Size = UDim2.new(0.19, 0, 0, 38)
     end)
     
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CosmicTheme.background}):Play()
+        btn.Size = UDim2.new(0.18, 0, 0, 35)
     end)
-    
-    return btn
 end
 
-createContextButton("Export Presets", exportPresets)
-createContextButton("Import Presets", function()
-    if getclipboard then
-        importPresets(getclipboard())
-    else
-        StatusText.Text = "Clipboard not supported"
-        StatusText.TextColor3 = CosmicTheme.error
-    end
-end)
-createContextButton("Clear All Presets", function()
-    presets = {}
-    savePresets()
-    updatePresetsUI(PresetFrame)
-    StatusText.Text = "All presets cleared"
-    StatusText.TextColor3 = CosmicTheme.warning
-end)
-createContextButton("Reset Avatar", function()
-    if lp.Character and lp.Character:FindFirstChild("Humanoid") then
-        local success = pcall(function()
-            local humanoidDesc = Players:GetHumanoidDescriptionFromUserId(lp.UserId)
-            lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
-        end)
+updatePresetUI(presetButtons)
+
+-- AUTO REAPPLY ON RESPAWN
+lp.CharacterAdded:Connect(function(char)
+    if currentAvatarData then
+        char:WaitForChild("Humanoid")
+        wait(1)
         
-        if success then
-            lastAppliedUsername = nil
-            StatusText.Text = "Avatar reset to original"
-            StatusText.TextColor3 = CosmicTheme.success
-        else
-            StatusText.Text = "Failed to reset avatar"
-            StatusText.TextColor3 = CosmicTheme.error
-        end
-    end
-end)
-
--- Right-click on MainFrame TitleBar to show context menu
-MainFrame:FindFirstChild("TitleBar").MouseButton2Click:Connect(function()
-    local mousePos = UserInputService:GetMouseLocation()
-    ContextMenu.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y - 36)
-    ContextMenu.Visible = not ContextMenu.Visible
-end)
-
--- Hide context menu when clicking outside
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if ContextMenu.Visible then
-            local mousePos = UserInputService:GetMouseLocation()
-            local menuPos = ContextMenu.AbsolutePosition
-            local menuSize = ContextMenu.AbsoluteSize
+        StatusText.Text = "🔄 Auto-reapplying avatar..."
+        StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
+        
+        local humanoidDesc = deserializeHumanoidDescription(currentAvatarData)
+        if humanoidDesc then
+            local success, message = applyAvatar(humanoidDesc)
             
-            if mousePos.X < menuPos.X or mousePos.X > menuPos.X + menuSize.X or
-               mousePos.Y < menuPos.Y or mousePos.Y > menuPos.Y + menuSize.Y then
-                ContextMenu.Visible = false
+            if success then
+                StatusText.Text = "✅ Auto-applied: " .. (currentAvatarData.username or "Preset")
+                StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
+            else
+                StatusText.Text = "❌ Auto-apply failed"
+                StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
             end
         end
     end
 end)
 
--- Status Update Helper
-local function updateStatus(message, color)
-    StatusText.Text = message
-    StatusText.TextColor3 = color or CosmicTheme.textDim
-end
-
--- Random Avatar from Presets
-local function loadRandomPreset()
-    if #presets == 0 then
-        updateStatus("No presets available", CosmicTheme.warning)
-        return
+-- Keyboard Shortcut (F1)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F1 then
+        toggleUI(MainFrame, ToggleButton)
     end
-    
-    local randomIndex = math.random(1, #presets)
-    local username = presets[randomIndex]
-    
-    updateStatus("Loading random: " .. username, CosmicTheme.warning)
-    
-    local success, message = loadAvatar(username)
-    
-    if success then
-        lastAppliedUsername = username
-        updateStatus("Active: " .. username, CosmicTheme.success)
-    else
-        updateStatus(message, CosmicTheme.error)
-    end
-end
+end)
 
--- Add Random Button to Context Menu
-createContextButton("Random Preset", loadRandomPreset)
-
--- Performance Monitor
-local lastFPS = 0
-local fpsConnection
-
-local function updateFPS()
-    local RunService = game:GetService("RunService")
-    local lastTime = tick()
-    local frameCount = 0
-    
-    fpsConnection = RunService.RenderStepped:Connect(function()
-        frameCount = frameCount + 1
-        local currentTime = tick()
-        
-        if currentTime - lastTime >= 1 then
-            lastFPS = frameCount
-            frameCount = 0
-            lastTime = currentTime
-        end
-    end)
-end
-
-updateFPS()
-
--- Notification System
-local function showNotification(message, duration, color)
-    local notif = Instance.new("Frame")
-    notif.Size = UDim2.new(0, 300, 0, 60)
-    notif.Position = UDim2.new(1, -320, 1, -80)
-    notif.BackgroundColor3 = CosmicTheme.surface
-    notif.BorderSizePixel = 0
-    notif.Parent = ScreenGui
-    
-    local notifCorner = Instance.new("UICorner")
-    notifCorner.CornerRadius = UDim.new(0, 10)
-    notifCorner.Parent = notif
-    
-    local notifStroke = Instance.new("UIStroke")
-    notifStroke.Color = color or CosmicTheme.primary
-    notifStroke.Thickness = 2
-    notifStroke.Parent = notif
-    
-    local notifText = Instance.new("TextLabel")
-    notifText.Size = UDim2.new(1, -20, 1, -20)
-    notifText.Position = UDim2.new(0, 10, 0, 10)
-    notifText.BackgroundTransparency = 1
-    notifText.Text = message
-    notifText.TextColor3 = CosmicTheme.text
-    notifText.TextSize = 13
-    notifText.Font = Enum.Font.Gotham
-    notifText.TextWrapped = true
-    notifText.Parent = notif
-    
-    -- Slide in animation
-    notif.Position = UDim2.new(1, 0, 1, -80)
-    TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(1, -320, 1, -80)
-    }):Play()
-    
-    -- Auto dismiss
-    wait(duration or 3)
-    
-    local slideOut = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(1, 0, 1, -80)
-    })
-    slideOut:Play()
-    slideOut.Completed:Connect(function()
-        notif:Destroy()
-    end)
-end
-
--- Welcome Message
-wait(0.5)
-showNotification("Avatar Changer Advanced Loaded\nPress F1 to toggle", 4, CosmicTheme.success)
+print("=== AVATAR CHANGER - FULL AVATAR PRESET SYSTEM ===")
+print("✅ Menyimpan SELURUH data avatar (bukan username)")
+print("✅ 5 Preset dengan data lengkap tersimpan ke file")
+print("✅ Left Click = Load Preset")
+print("✅ Right Click = Save Current Avatar (FULL DATA)")
+print("✅ Auto load setelah rejoin/respawn")
+print("✅ Tools tetap aman saat equip")
+print("✅ Tekan F1 untuk toggle UI")
+print("✅ Compatible dengan Delta Executor Android")
+print("==================================================")
+print("📁 File: " .. PRESET_FILE)
+print("==")
