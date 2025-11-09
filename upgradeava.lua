@@ -1,14 +1,13 @@
--- AVATAR CHANGER - FULL AVATAR PRESET SYSTEM
--- ✅ 5 Preset Avatar dengan data lengkap (bukan username)
--- ✅ Menyimpan seluruh HumanoidDescription
+-- AVATAR CHANGER - FULL DATA PRESET SYSTEM
+-- ✅ Menyimpan SEMUA data avatar (bukan cuma username)
+-- ✅ Preset tidak berubah meskipun user asli ganti avatar
+-- ✅ Simpan: Body, Hair, Face, Accessories, Clothes, dll
 -- ✅ Auto load preset setelah rejoin/ganti map
 -- ✅ Tools tidak hilang saat equip
--- ✅ Compatible dengan Delta Executor Android
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 
 local lp = Players.LocalPlayer
 
@@ -18,124 +17,168 @@ local UIState = {
     isAnimating = false
 }
 
-local currentAvatarData = nil -- Menyimpan data avatar yang sedang aktif
+local currentAvatarData = nil
 local presets = {}
 local PRESET_FILE = "avatar_presets_full.json"
 
--- Fungsi untuk serialize HumanoidDescription ke table
-local function serializeHumanoidDescription(desc)
-    if not desc then return nil end
+-- Function untuk mengambil SEMUA data avatar
+local function captureFullAvatarData(humanoidDesc)
+    if not humanoidDesc then return nil end
     
-    local data = {
-        -- Body Colors
-        HeadColor = {desc.HeadColor.R, desc.HeadColor.G, desc.HeadColor.B},
-        TorsoColor = {desc.TorsoColor.R, desc.TorsoColor.G, desc.TorsoColor.B},
-        LeftArmColor = {desc.LeftArmColor.R, desc.LeftArmColor.G, desc.LeftArmColor.B},
-        RightArmColor = {desc.RightArmColor.R, desc.RightArmColor.G, desc.RightArmColor.B},
-        LeftLegColor = {desc.LeftLegColor.R, desc.LeftLegColor.G, desc.LeftLegColor.B},
-        RightLegColor = {desc.RightLegColor.R, desc.RightLegColor.G, desc.RightLegColor.B},
-        
+    local avatarData = {
         -- Body Parts
-        Head = desc.Head,
-        Torso = desc.Torso,
-        LeftArm = desc.LeftArm,
-        RightArm = desc.RightArm,
-        LeftLeg = desc.LeftLeg,
-        RightLeg = desc.RightLeg,
+        HeadColor = humanoidDesc.HeadColor,
+        TorsoColor = humanoidDesc.TorsoColor,
+        LeftArmColor = humanoidDesc.LeftArmColor,
+        RightArmColor = humanoidDesc.RightArmColor,
+        LeftLegColor = humanoidDesc.LeftLegColor,
+        RightLegColor = humanoidDesc.RightLegColor,
         
-        -- Scales
-        BodyTypeScale = desc.BodyTypeScale,
-        DepthScale = desc.DepthScale,
-        HeadScale = desc.HeadScale,
-        HeightScale = desc.HeightScale,
-        ProportionScale = desc.ProportionScale,
-        WidthScale = desc.WidthScale,
+        -- Body Scale
+        BodyTypeScale = humanoidDesc.BodyTypeScale,
+        DepthScale = humanoidDesc.DepthScale,
+        HeadScale = humanoidDesc.HeadScale,
+        HeightScale = humanoidDesc.HeightScale,
+        ProportionScale = humanoidDesc.ProportionScale,
+        WidthScale = humanoidDesc.WidthScale,
         
-        -- Clothing & Accessories
-        Face = desc.Face,
-        Shirt = desc.Shirt,
-        Pants = desc.Pants,
-        GraphicTShirt = desc.GraphicTShirt,
+        -- Face & Hair
+        Face = humanoidDesc.Face,
+        Head = humanoidDesc.Head,
+        HairAccessory = humanoidDesc.HairAccessory,
+        FaceAccessory = humanoidDesc.FaceAccessory,
+        NeckAccessory = humanoidDesc.NeckAccessory,
+        ShoulderAccessory = humanoidDesc.ShoulderAccessory,
+        FrontAccessory = humanoidDesc.FrontAccessory,
+        BackAccessory = humanoidDesc.BackAccessory,
+        WaistAccessory = humanoidDesc.WaistAccessory,
         
-        -- Accessories (semua slot)
-        BackAccessory = desc.BackAccessory,
-        FaceAccessory = desc.FaceAccessory,
-        FrontAccessory = desc.FrontAccessory,
-        HairAccessory = desc.HairAccessory,
-        HatAccessory = desc.HatAccessory,
-        NeckAccessory = desc.NeckAccessory,
-        ShouldersAccessory = desc.ShouldersAccessory,
-        WaistAccessory = desc.WaistAccessory,
+        -- Clothing (Classic & Layered)
+        Shirt = humanoidDesc.Shirt,
+        Pants = humanoidDesc.Pants,
+        GraphicTShirt = humanoidDesc.GraphicTShirt,
         
-        -- Emotes
-        ClimbAnimation = desc.ClimbAnimation,
-        FallAnimation = desc.FallAnimation,
-        IdleAnimation = desc.IdleAnimation,
-        JumpAnimation = desc.JumpAnimation,
-        RunAnimation = desc.RunAnimation,
-        SwimAnimation = desc.SwimAnimation,
-        WalkAnimation = desc.WalkAnimation,
+        -- Layered Clothing (Roblox baru)
+        ShirtAccessory = humanoidDesc.ShirtAccessory,
+        PantsAccessory = humanoidDesc.PantsAccessory,
+        JacketAccessory = humanoidDesc.JacketAccessory,
+        SweaterAccessory = humanoidDesc.SweaterAccessory,
+        ShortsAccessory = humanoidDesc.ShortsAccessory,
+        LeftShoeAccessory = humanoidDesc.LeftShoeAccessory,
+        RightShoeAccessory = humanoidDesc.RightShoeAccessory,
+        DressSkirtAccessory = humanoidDesc.DressSkirtAccessory,
+        
+        -- Emotes & Animation
+        ClimbAnimation = humanoidDesc.ClimbAnimation,
+        FallAnimation = humanoidDesc.FallAnimation,
+        IdleAnimation = humanoidDesc.IdleAnimation,
+        JumpAnimation = humanoidDesc.JumpAnimation,
+        RunAnimation = humanoidDesc.RunAnimation,
+        SwimAnimation = humanoidDesc.SwimAnimation,
+        WalkAnimation = humanoidDesc.WalkAnimation,
+        
+        -- Body Parts IDs
+        LeftArm = humanoidDesc.LeftArm,
+        RightArm = humanoidDesc.RightArm,
+        LeftLeg = humanoidDesc.LeftLeg,
+        RightLeg = humanoidDesc.RightLeg,
+        Torso = humanoidDesc.Torso,
+        
+        -- Ekstra
+        MoodAnimation = humanoidDesc.MoodAnimation,
+        EmoteAnimation1 = pcall(function() return humanoidDesc.EmoteAnimation1 end) and humanoidDesc.EmoteAnimation1 or 0,
+        EmoteAnimation2 = pcall(function() return humanoidDesc.EmoteAnimation2 end) and humanoidDesc.EmoteAnimation2 or 0,
+        EmoteAnimation3 = pcall(function() return humanoidDesc.EmoteAnimation3 end) and humanoidDesc.EmoteAnimation3 or 0,
     }
     
-    return data
+    return avatarData
 end
 
--- Fungsi untuk deserialize table ke HumanoidDescription
-local function deserializeHumanoidDescription(data)
-    if not data then return nil end
+-- Function untuk apply avatar dari data tersimpan
+local function applyAvatarFromData(avatarData)
+    if not avatarData then return false, "No avatar data" end
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character not found"
+    end
     
-    local desc = Instance.new("HumanoidDescription")
+    -- Buat HumanoidDescription baru
+    local humanoidDesc = Instance.new("HumanoidDescription")
     
-    -- Body Colors
-    desc.HeadColor = Color3.new(data.HeadColor[1], data.HeadColor[2], data.HeadColor[3])
-    desc.TorsoColor = Color3.new(data.TorsoColor[1], data.TorsoColor[2], data.TorsoColor[3])
-    desc.LeftArmColor = Color3.new(data.LeftArmColor[1], data.LeftArmColor[2], data.LeftArmColor[3])
-    desc.RightArmColor = Color3.new(data.RightArmColor[1], data.RightArmColor[2], data.RightArmColor[3])
-    desc.LeftLegColor = Color3.new(data.LeftLegColor[1], data.LeftLegColor[2], data.LeftLegColor[3])
-    desc.RightLegColor = Color3.new(data.RightLegColor[1], data.RightLegColor[2], data.RightLegColor[3])
+    -- Apply semua data
+    for property, value in pairs(avatarData) do
+        local success = pcall(function()
+            humanoidDesc[property] = value
+        end)
+        if not success then
+            warn("Failed to set property: " .. property)
+        end
+    end
     
-    -- Body Parts
-    desc.Head = data.Head or 0
-    desc.Torso = data.Torso or 0
-    desc.LeftArm = data.LeftArm or 0
-    desc.RightArm = data.RightArm or 0
-    desc.LeftLeg = data.LeftLeg or 0
-    desc.RightLeg = data.RightLeg or 0
+    -- Simpan tools
+    local savedTools = {}
+    local equippedTool = nil
     
-    -- Scales
-    desc.BodyTypeScale = data.BodyTypeScale or 0
-    desc.DepthScale = data.DepthScale or 1
-    desc.HeadScale = data.HeadScale or 1
-    desc.HeightScale = data.HeightScale or 1
-    desc.ProportionScale = data.ProportionScale or 0
-    desc.WidthScale = data.WidthScale or 1
+    for _, item in pairs(lp.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            equippedTool = item
+            table.insert(savedTools, item:Clone())
+            item.Parent = nil
+        end
+    end
     
-    -- Clothing & Accessories
-    desc.Face = data.Face or 0
-    desc.Shirt = data.Shirt or 0
-    desc.Pants = data.Pants or 0
-    desc.GraphicTShirt = data.GraphicTShirt or 0
+    for _, item in pairs(lp.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+        end
+    end
     
-    -- Accessories
-    desc.BackAccessory = data.BackAccessory or ""
-    desc.FaceAccessory = data.FaceAccessory or ""
-    desc.FrontAccessory = data.FrontAccessory or ""
-    desc.HairAccessory = data.HairAccessory or ""
-    desc.HatAccessory = data.HatAccessory or ""
-    desc.NeckAccessory = data.NeckAccessory or ""
-    desc.ShouldersAccessory = data.ShouldersAccessory or ""
-    desc.WaistAccessory = data.WaistAccessory or ""
+    -- Hapus accessories & clothing lama
+    pcall(function()
+        for _, accessory in pairs(lp.Character:GetChildren()) do
+            if accessory:IsA("Accessory") then
+                accessory:Destroy()
+            end
+        end
+        
+        for _, clothing in pairs(lp.Character:GetChildren()) do
+            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
+                clothing:Destroy()
+            end
+        end
+    end)
     
-    -- Animations
-    desc.ClimbAnimation = data.ClimbAnimation or 0
-    desc.FallAnimation = data.FallAnimation or 0
-    desc.IdleAnimation = data.IdleAnimation or 0
-    desc.JumpAnimation = data.JumpAnimation or 0
-    desc.RunAnimation = data.RunAnimation or 0
-    desc.SwimAnimation = data.SwimAnimation or 0
-    desc.WalkAnimation = data.WalkAnimation or 0
+    wait(0.1)
     
-    return desc
+    -- Apply avatar baru
+    local success = pcall(function()
+        lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
+    end)
+    
+    if not success then
+        for _, tool in pairs(savedTools) do
+            tool.Parent = lp.Backpack
+        end
+        return false, "Failed to apply avatar"
+    end
+    
+    wait(0.3)
+    
+    -- Restore tools
+    for _, tool in pairs(savedTools) do
+        if tool and tool:IsA("Tool") then
+            tool.Parent = lp.Backpack
+        end
+    end
+    
+    if equippedTool then
+        wait(0.1)
+        local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
+        if toolInBackpack then
+            lp.Character.Humanoid:EquipTool(toolInBackpack)
+        end
+    end
+    
+    return true, "Avatar applied successfully"
 end
 
 -- Load presets dari file
@@ -147,7 +190,7 @@ local function loadPresets()
     
     if isfile(PRESET_FILE) then
         local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(PRESET_FILE))
+            return game:GetService("HttpService"):JSONDecode(readfile(PRESET_FILE))
         end)
         
         if success and data then
@@ -165,12 +208,53 @@ local function savePresets()
     end
     
     local success = pcall(function()
-        local json = HttpService:JSONEncode(presets)
+        local json = game:GetService("HttpService"):JSONEncode(presets)
         writefile(PRESET_FILE, json)
     end)
     
     if success then
         print("✅ Presets saved to file")
+    end
+end
+
+-- Load Avatar dari Username (dan simpan data lengkapnya)
+local function loadAvatarFromUsername(username)
+    if not username or username == "" then
+        return false, "Username tidak boleh kosong!"
+    end
+    
+    local success, userId = pcall(function()
+        return Players:GetUserIdFromNameAsync(username)
+    end)
+    
+    if not success then
+        return false, "Username tidak ditemukan: " .. username
+    end
+    
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character tidak ada!"
+    end
+    
+    local humanoidDesc
+    local success2 = pcall(function()
+        humanoidDesc = Players:GetHumanoidDescriptionFromUserId(userId)
+    end)
+    
+    if not success2 or not humanoidDesc then
+        return false, "Gagal mendapatkan avatar"
+    end
+    
+    -- CAPTURE semua data avatar
+    currentAvatarData = captureFullAvatarData(humanoidDesc)
+    currentAvatarData.username = username -- Simpan username untuk label
+    
+    -- Apply avatar
+    local applySuccess, applyMessage = applyAvatarFromData(currentAvatarData)
+    
+    if applySuccess then
+        return true, "Avatar loaded: " .. username
+    else
+        return false, applyMessage
     end
 end
 
@@ -294,7 +378,7 @@ local function createUI()
     local PresetTitle = Instance.new("TextLabel")
     PresetTitle.Size = UDim2.new(1, 0, 0, 20)
     PresetTitle.BackgroundTransparency = 1
-    PresetTitle.Text = "⭐ PRESETS (Right-Click to Save Full Avatar)"
+    PresetTitle.Text = "⭐ PRESETS (Right-Click to Save Full Data)"
     PresetTitle.TextColor3 = Color3.fromRGB(255, 200, 0)
     PresetTitle.TextScaled = true
     PresetTitle.Font = Enum.Font.GothamBold
@@ -349,7 +433,7 @@ local function createUI()
     StatusText.Size = UDim2.new(1, -10, 1, 0)
     StatusText.Position = UDim2.new(0, 5, 0, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "✨ Ready (Full Avatar System)"
+    StatusText.Text = "✨ Ready (Full Data Storage)"
     StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
     StatusText.TextScaled = true
     StatusText.Font = Enum.Font.GothamBold
@@ -357,109 +441,6 @@ local function createUI()
     StatusText.Parent = StatusFrame
     
     return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons
-end
-
--- Load Avatar dari Username
-local function loadAvatarFromUsername(username)
-    if not username or username == "" then
-        return false, "Username tidak boleh kosong!", nil
-    end
-    
-    local success, userId = pcall(function()
-        return Players:GetUserIdFromNameAsync(username)
-    end)
-    
-    if not success then
-        return false, "Username tidak ditemukan: " .. username, nil
-    end
-    
-    local humanoidDesc
-    local success2 = pcall(function()
-        humanoidDesc = Players:GetHumanoidDescriptionFromUserId(userId)
-    end)
-    
-    if not success2 or not humanoidDesc then
-        return false, "Gagal mendapatkan avatar", nil
-    end
-    
-    -- Serialize avatar data
-    local avatarData = serializeHumanoidDescription(humanoidDesc)
-    avatarData.username = username -- Simpan username untuk label
-    
-    return true, "Avatar loaded: " .. username, avatarData, humanoidDesc
-end
-
--- Apply Avatar dari HumanoidDescription
-local function applyAvatar(humanoidDesc)
-    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
-        return false, "Character tidak ada!"
-    end
-    
-    -- Simpan tools
-    local savedTools = {}
-    local equippedTool = nil
-    
-    for _, item in pairs(lp.Character:GetChildren()) do
-        if item:IsA("Tool") then
-            equippedTool = item
-            table.insert(savedTools, item:Clone())
-            item.Parent = nil
-        end
-    end
-    
-    for _, item in pairs(lp.Backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            table.insert(savedTools, item:Clone())
-        end
-    end
-    
-    -- Hapus accessories & clothing
-    pcall(function()
-        for _, accessory in pairs(lp.Character:GetChildren()) do
-            if accessory:IsA("Accessory") then
-                accessory:Destroy()
-            end
-        end
-        
-        for _, clothing in pairs(lp.Character:GetChildren()) do
-            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
-                clothing:Destroy()
-            end
-        end
-    end)
-    
-    wait(0.1)
-    
-    -- Apply avatar
-    local success = pcall(function()
-        lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
-    end)
-    
-    if not success then
-        for _, tool in pairs(savedTools) do
-            tool.Parent = lp.Backpack
-        end
-        return false, "Gagal apply avatar"
-    end
-    
-    wait(0.3)
-    
-    -- Restore tools
-    for _, tool in pairs(savedTools) do
-        if tool and tool:IsA("Tool") then
-            tool.Parent = lp.Backpack
-        end
-    end
-    
-    if equippedTool then
-        wait(0.1)
-        local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
-        if toolInBackpack then
-            lp.Character.Humanoid:EquipTool(toolInBackpack)
-        end
-    end
-    
-    return true, "Avatar applied successfully!"
 end
 
 -- Update Preset UI
@@ -592,24 +573,15 @@ local function handleSubmit()
     if username and username ~= "" then
         UsernameInput.PlaceholderText = "Loading..."
         UsernameInput.Text = ""
-        StatusText.Text = "⏳ Loading avatar data..."
+        StatusText.Text = "⏳ Capturing full avatar data..."
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
-        local success, message, avatarData, humanoidDesc = loadAvatarFromUsername(username)
+        local success, message = loadAvatarFromUsername(username)
         
         if success then
-            local applySuccess, applyMessage = applyAvatar(humanoidDesc)
-            
-            if applySuccess then
-                currentAvatarData = avatarData
-                UsernameInput.PlaceholderText = "✓ Active: " .. username
-                StatusText.Text = "✅ Avatar Applied: " .. username
-                StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-            else
-                UsernameInput.PlaceholderText = "✗ Apply Failed"
-                StatusText.Text = "❌ " .. applyMessage
-                StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-            end
+            UsernameInput.PlaceholderText = "✓ Active: " .. username
+            StatusText.Text = "✅ Full data captured: " .. username
+            StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
             UsernameInput.PlaceholderText = "✗ Failed"
             StatusText.Text = "❌ " .. message
@@ -617,7 +589,7 @@ local function handleSubmit()
             
             wait(3)
             UsernameInput.PlaceholderText = "Enter username..."
-            StatusText.Text = "✨ Ready (Full Avatar System)"
+            StatusText.Text = "✨ Ready (Full Data Storage)"
             StatusText.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
     end
@@ -641,26 +613,20 @@ end)
 
 -- Preset Buttons Logic
 for i, btn in ipairs(presetButtons) do
-    -- Left Click: Load preset
+    -- Left Click: Load preset (dari data tersimpan)
     btn.MouseButton1Click:Connect(function()
         if presets[i] then
             StatusText.Text = "⏳ Loading Preset " .. i .. "..."
             StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
             
-            local humanoidDesc = deserializeHumanoidDescription(presets[i])
-            if humanoidDesc then
-                local success, message = applyAvatar(humanoidDesc)
-                
-                if success then
-                    currentAvatarData = presets[i]
-                    StatusText.Text = "✅ Preset " .. i .. " loaded!"
-                    StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-                else
-                    StatusText.Text = "❌ Failed: " .. message
-                    StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-                end
+            local success, message = applyAvatarFromData(presets[i])
+            
+            if success then
+                currentAvatarData = presets[i]
+                StatusText.Text = "✅ Preset " .. i .. " loaded!"
+                StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
             else
-                StatusText.Text = "❌ Preset data corrupted!"
+                StatusText.Text = "❌ Preset failed: " .. message
                 StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
             end
         else
@@ -669,14 +635,14 @@ for i, btn in ipairs(presetButtons) do
         end
     end)
     
-    -- Right Click: Save current avatar
+    -- Right Click: Save FULL DATA avatar saat ini
     btn.MouseButton2Click:Connect(function()
         if currentAvatarData then
             presets[i] = currentAvatarData
             savePresets()
             updatePresetUI(presetButtons)
             
-            StatusText.Text = "💾 Full Avatar saved to Preset " .. i .. "!"
+            StatusText.Text = "💾 Full data saved to Preset " .. i .. "!"
             StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
         else
             StatusText.Text = "⚠️ Apply avatar first!"
@@ -696,26 +662,23 @@ end
 
 updatePresetUI(presetButtons)
 
--- AUTO REAPPLY ON RESPAWN
+-- AUTO REAPPLY ON RESPAWN (menggunakan data tersimpan)
 lp.CharacterAdded:Connect(function(char)
     if currentAvatarData then
         char:WaitForChild("Humanoid")
         wait(1)
         
-        StatusText.Text = "🔄 Auto-reapplying avatar..."
+        StatusText.Text = "🔄 Auto-reapplying: " .. (currentAvatarData.username or "Avatar")
         StatusText.TextColor3 = Color3.fromRGB(255, 255, 0)
         
-        local humanoidDesc = deserializeHumanoidDescription(currentAvatarData)
-        if humanoidDesc then
-            local success, message = applyAvatar(humanoidDesc)
-            
-            if success then
-                StatusText.Text = "✅ Auto-applied: " .. (currentAvatarData.username or "Preset")
-                StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-            else
-                StatusText.Text = "❌ Auto-apply failed"
-                StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-            end
+        local success, message = applyAvatarFromData(currentAvatarData)
+        
+        if success then
+            StatusText.Text = "✅ Auto-applied: " .. (currentAvatarData.username or "Avatar")
+            StatusText.TextColor3 = Color3.fromRGB(0, 255, 0)
+        else
+            StatusText.Text = "❌ Auto-apply failed"
+            StatusText.TextColor3 = Color3.fromRGB(255, 0, 0)
         end
     end
 end)
@@ -728,15 +691,33 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("=== AVATAR CHANGER - FULL AVATAR PRESET SYSTEM ===")
-print("✅ Menyimpan SELURUH data avatar (bukan username)")
-print("✅ 5 Preset dengan data lengkap tersimpan ke file")
+print("=== AVATAR CHANGER - FULL DATA PRESET ===")
+print("✅ Menyimpan SEMUA data avatar (50+ properties)")
+print("✅ Preset tidak berubah meskipun user asli ganti avatar")
+print("✅ Simpan: Body, Hair, Face, Clothes, Accessories, dll")
 print("✅ Left Click = Load Preset")
-print("✅ Right Click = Save Current Avatar (FULL DATA)")
+print("✅ Right Click = Save Full Avatar Data")
 print("✅ Auto load setelah rejoin/respawn")
-print("✅ Tools tetap aman saat equip")
 print("✅ Tekan F1 untuk toggle UI")
-print("✅ Compatible dengan Delta Executor Android")
-print("==================================================")
-print("📁 File: " .. PRESET_FILE)
-print("==")
+print("==========================================")
+
+-- Additional Info
+warn([[
+📌 CARA KERJA:
+1. Masukkan username → SUBMIT (akan menyimpan SEMUA data avatar)
+2. Right-Click preset slot untuk save avatar saat ini
+3. Left-Click preset slot untuk load avatar tersimpan
+4. Avatar di preset TIDAK BERUBAH meskipun user asli ganti avatar!
+
+💾 DATA YANG DISIMPAN:
+- Body Parts (Head, Torso, Arms, Legs) + Colors
+- Body Scale (Height, Width, Depth, Proportion)
+- Face & Hair
+- Semua Accessories (Hair, Face, Neck, Shoulder, Front, Back, Waist)
+- Classic Clothing (Shirt, Pants, Graphic T-Shirt)
+- Layered Clothing (Shirt, Pants, Jacket, Sweater, Shorts, Shoes, Dress)
+- Animations (Walk, Run, Jump, Idle, Climb, Fall, Swim)
+- Emotes & Mood Animations
+
+🔒 File disimpan di: avatar_presets_full.json
+]])
