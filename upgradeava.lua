@@ -1,19 +1,10 @@
--- AVATAR CHANGER - MODERN UI + CACHE SYSTEM
--- ✅ Cache system untuk fix rate limit
--- ✅ Modern glassmorphism UI
--- ✅ No toggle button on PC (F1 only)
--- ✅ Toggle button only on mobile
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local lp = Players.LocalPlayer
-
--- Detect Platform
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
--- State Management
 local UIState = {
     isOpen = false,
     isAnimating = false
@@ -22,17 +13,62 @@ local UIState = {
 local lastAppliedUsername = nil
 local presets = {}
 local PRESET_FILE = "avatar_presets.json"
-
--- CACHE SYSTEM untuk fix rate limit
 local userIdCache = {}
 local avatarDescCache = {}
+local loadingSteps = {}
 
--- Load presets dari file
+local function showNotification(text, color, duration)
+    local ScreenGui = lp.PlayerGui:FindFirstChild("NotificationGui") or Instance.new("ScreenGui")
+    ScreenGui.Name = "NotificationGui"
+    ScreenGui.Parent = lp.PlayerGui
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local Notif = Instance.new("Frame")
+    Notif.Size = UDim2.new(0, 300, 0, 60)
+    Notif.Position = UDim2.new(1, -320, 1, 20)
+    Notif.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Notif.BackgroundTransparency = 0.1
+    Notif.BorderSizePixel = 0
+    Notif.Parent = ScreenGui
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = Notif
+    
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = color
+    Stroke.Thickness = 2
+    Stroke.Parent = Notif
+    
+    local Text = Instance.new("TextLabel")
+    Text.Size = UDim2.new(1, -20, 1, -10)
+    Text.Position = UDim2.new(0, 10, 0, 5)
+    Text.BackgroundTransparency = 1
+    Text.Text = text
+    Text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Text.TextSize = 13
+    Text.Font = Enum.Font.GothamBold
+    Text.TextWrapped = true
+    Text.Parent = Notif
+    
+    local slideIn = TweenService:Create(Notif, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -320, 1, -80)
+    })
+    slideIn:Play()
+    
+    task.wait(duration or 3)
+    
+    local slideOut = TweenService:Create(Notif, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Position = UDim2.new(1, -320, 1, 20)
+    })
+    slideOut:Play()
+    slideOut.Completed:Wait()
+    Notif:Destroy()
+end
+
 local function loadPresets()
-    if not readfile or not isfile then 
-        warn("Executor tidak support file operations")
-        return 
-    end
+    if not readfile or not isfile then return end
     
     if isfile(PRESET_FILE) then
         local success, data = pcall(function()
@@ -41,17 +77,12 @@ local function loadPresets()
         
         if success and data then
             presets = data
-            print("✅ Loaded " .. #presets .. " presets")
         end
     end
 end
 
--- Save presets ke file
 local function savePresets()
-    if not writefile then 
-        warn("Executor tidak support file writing")
-        return 
-    end
+    if not writefile then return end
     
     pcall(function()
         local json = game:GetService("HttpService"):JSONEncode(presets)
@@ -59,16 +90,13 @@ local function savePresets()
     end)
 end
 
--- Get User ID dengan cache
 local function getUserId(username)
     username = string.lower(username)
     
-    -- Check cache first
     if userIdCache[username] then
         return true, userIdCache[username]
     end
     
-    -- Fetch dari API
     local success, userId = pcall(function()
         return Players:GetUserIdFromNameAsync(username)
     end)
@@ -81,14 +109,11 @@ local function getUserId(username)
     return false, nil
 end
 
--- Get Avatar Description dengan cache
 local function getAvatarDesc(userId)
-    -- Check cache first
     if avatarDescCache[userId] then
         return true, avatarDescCache[userId]
     end
     
-    -- Fetch dari API
     local success, desc = pcall(function()
         return Players:GetHumanoidDescriptionFromUserId(userId)
     end)
@@ -101,7 +126,16 @@ local function getAvatarDesc(userId)
     return false, nil
 end
 
--- Toggle Button Creation (hanya untuk mobile)
+local function updateLoadingLog(logText, step, total)
+    if loadingSteps.textLabel then
+        local progress = ""
+        if step and total then
+            progress = string.format(" [%d/%d]", step, total)
+        end
+        loadingSteps.textLabel.Text = logText .. progress
+    end
+end
+
 local function createToggleButton()
     if not isMobile then return nil end
     
@@ -132,7 +166,6 @@ local function createToggleButton()
     return ToggleButton
 end
 
--- Modern UI Creation
 local function createUI()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "ModernAvatarChanger"
@@ -145,11 +178,10 @@ local function createUI()
         ToggleButton.Parent = ScreenGui
     end
     
-    -- Main Frame dengan Glassmorphism
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 420, 0, 280)
-    MainFrame.Position = UDim2.new(0.5, -210, 0.5, -140)
+    MainFrame.Size = UDim2.new(0, 450, 0, 380)
+    MainFrame.Position = UDim2.new(0.5, -225, 0.5, -190)
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
     MainFrame.BackgroundTransparency = 0.1
@@ -167,7 +199,6 @@ local function createUI()
     MainStroke.Transparency = 0.6
     MainStroke.Parent = MainFrame
     
-    -- Gradient Background
     local Gradient = Instance.new("UIGradient")
     Gradient.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 50)),
@@ -176,7 +207,6 @@ local function createUI()
     Gradient.Rotation = 45
     Gradient.Parent = MainFrame
     
-    -- Close Button (hanya di PC)
     if not isMobile then
         local CloseButton = Instance.new("TextButton")
         CloseButton.Name = "CloseButton"
@@ -196,7 +226,6 @@ local function createUI()
         CloseCorner.Parent = CloseButton
     end
     
-    -- Title
     local TitleText = Instance.new("TextLabel")
     TitleText.Size = UDim2.new(1, -40, 0, 35)
     TitleText.Position = UDim2.new(0, 20, 0, 10)
@@ -219,7 +248,6 @@ local function createUI()
     SubTitle.TextXAlignment = Enum.TextXAlignment.Left
     SubTitle.Parent = MainFrame
     
-    -- Input Section
     local InputContainer = Instance.new("Frame")
     InputContainer.Size = UDim2.new(1, -40, 0, 45)
     InputContainer.Position = UDim2.new(0, 20, 0, 60)
@@ -263,7 +291,6 @@ local function createUI()
     SubmitCorner.CornerRadius = UDim.new(0, 8)
     SubmitCorner.Parent = SubmitButton
     
-    -- Preset Section
     local PresetContainer = Instance.new("Frame")
     PresetContainer.Size = UDim2.new(1, -40, 0, 120)
     PresetContainer.Position = UDim2.new(0, 20, 0, 115)
@@ -298,7 +325,6 @@ local function createUI()
     PresetHint.TextXAlignment = Enum.TextXAlignment.Left
     PresetHint.Parent = PresetContainer
     
-    -- 5 Preset Buttons
     local presetButtons = {}
     for i = 1, 5 do
         local btn = Instance.new("TextButton")
@@ -346,7 +372,69 @@ local function createUI()
         presetButtons[i] = btn
     end
     
-    -- Status Bar
+    local LoadingLogFrame = Instance.new("Frame")
+    LoadingLogFrame.Name = "LoadingLogFrame"
+    LoadingLogFrame.Size = UDim2.new(1, -40, 0, 60)
+    LoadingLogFrame.Position = UDim2.new(0, 20, 0, 245)
+    LoadingLogFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    LoadingLogFrame.BackgroundTransparency = 0.4
+    LoadingLogFrame.BorderSizePixel = 0
+    LoadingLogFrame.Parent = MainFrame
+    
+    local LogCorner = Instance.new("UICorner")
+    LogCorner.CornerRadius = UDim.new(0, 10)
+    LogCorner.Parent = LoadingLogFrame
+    
+    local LogTitle = Instance.new("TextLabel")
+    LogTitle.Size = UDim2.new(1, -10, 0, 15)
+    LogTitle.Position = UDim2.new(0, 5, 0, 3)
+    LogTitle.BackgroundTransparency = 1
+    LogTitle.Text = "📊 LOADING LOG"
+    LogTitle.TextColor3 = Color3.fromRGB(255, 200, 100)
+    LogTitle.TextSize = 11
+    LogTitle.Font = Enum.Font.GothamBold
+    LogTitle.TextXAlignment = Enum.TextXAlignment.Left
+    LogTitle.Parent = LoadingLogFrame
+    
+    local LogText = Instance.new("TextLabel")
+    LogText.Name = "LogText"
+    LogText.Size = UDim2.new(1, -10, 1, -20)
+    LogText.Position = UDim2.new(0, 5, 0, 18)
+    LogText.BackgroundTransparency = 1
+    LogText.Text = "Idle..."
+    LogText.TextColor3 = Color3.fromRGB(180, 180, 200)
+    LogText.TextSize = 10
+    LogText.Font = Enum.Font.Gotham
+    LogText.TextXAlignment = Enum.TextXAlignment.Left
+    LogText.TextYAlignment = Enum.TextYAlignment.Top
+    LogText.TextWrapped = true
+    LogText.Parent = LoadingLogFrame
+    
+    loadingSteps.textLabel = LogText
+    
+    local ResetButton = Instance.new("TextButton")
+    ResetButton.Name = "ResetButton"
+    ResetButton.Size = UDim2.new(1, -40, 0, 40)
+    ResetButton.Position = UDim2.new(0, 20, 0, 315)
+    ResetButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+    ResetButton.BackgroundTransparency = 0.2
+    ResetButton.BorderSizePixel = 0
+    ResetButton.Text = "🔄 RESET TO DEFAULT"
+    ResetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ResetButton.TextSize = 13
+    ResetButton.Font = Enum.Font.GothamBold
+    ResetButton.Parent = MainFrame
+    
+    local ResetCorner = Instance.new("UICorner")
+    ResetCorner.CornerRadius = UDim.new(0, 10)
+    ResetCorner.Parent = ResetButton
+    
+    local ResetStroke = Instance.new("UIStroke")
+    ResetStroke.Color = Color3.fromRGB(255, 120, 120)
+    ResetStroke.Thickness = 1.5
+    ResetStroke.Transparency = 0.5
+    ResetStroke.Parent = ResetButton
+    
     local StatusBar = Instance.new("Frame")
     StatusBar.Size = UDim2.new(1, -40, 0, 35)
     StatusBar.Position = UDim2.new(0, 20, 1, -45)
@@ -371,32 +459,146 @@ local function createUI()
     StatusText.TextXAlignment = Enum.TextXAlignment.Center
     StatusText.Parent = StatusBar
     
-    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons
+    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton
 end
 
--- Load Avatar Function dengan Cache
+local function removeDuplicateTools()
+    local toolNames = {}
+    local toRemove = {}
+    
+    for _, tool in pairs(lp.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            if toolNames[tool.Name] then
+                table.insert(toRemove, tool)
+            else
+                toolNames[tool.Name] = true
+            end
+        end
+    end
+    
+    if lp.Character then
+        for _, tool in pairs(lp.Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                if toolNames[tool.Name] then
+                    table.insert(toRemove, tool)
+                else
+                    toolNames[tool.Name] = true
+                end
+            end
+        end
+    end
+    
+    for _, tool in pairs(toRemove) do
+        tool:Destroy()
+    end
+    
+    return #toRemove
+end
+
+local function resetToDefault()
+    updateLoadingLog("Resetting to default avatar...", nil, nil)
+    
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character not found!"
+    end
+    
+    updateLoadingLog("Getting original avatar data...", 1, 4)
+    task.wait(0.1)
+    
+    local success, originalDesc = pcall(function()
+        return Players:GetHumanoidDescriptionFromUserId(lp.UserId)
+    end)
+    
+    if not success then
+        return false, "Failed to get original avatar"
+    end
+    
+    updateLoadingLog("Saving current tools...", 2, 4)
+    local savedTools = {}
+    for _, item in pairs(lp.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+            item.Parent = nil
+        end
+    end
+    for _, item in pairs(lp.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+        end
+    end
+    
+    updateLoadingLog("Removing current avatar parts...", 3, 4)
+    pcall(function()
+        for _, accessory in pairs(lp.Character:GetChildren()) do
+            if accessory:IsA("Accessory") then
+                accessory:Destroy()
+            end
+        end
+        for _, clothing in pairs(lp.Character:GetChildren()) do
+            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
+                clothing:Destroy()
+            end
+        end
+    end)
+    
+    task.wait(0.1)
+    
+    updateLoadingLog("Applying default avatar...", 4, 4)
+    local success2 = pcall(function()
+        lp.Character.Humanoid:ApplyDescriptionClientServer(originalDesc)
+    end)
+    
+    if not success2 then
+        return false, "Failed to apply default"
+    end
+    
+    task.wait(0.3)
+    
+    for _, tool in pairs(savedTools) do
+        if tool and tool:IsA("Tool") then
+            tool.Parent = lp.Backpack
+        end
+    end
+    
+    local removed = removeDuplicateTools()
+    
+    lastAppliedUsername = nil
+    userIdCache = {}
+    avatarDescCache = {}
+    
+    updateLoadingLog("Reset complete! Removed " .. removed .. " duplicate tools", nil, nil)
+    
+    return true, "Default avatar restored"
+end
+
 local function loadAvatar(username)
     if not username or username == "" then
         return false, "Username kosong!"
     end
     
-    -- Get User ID (with cache)
+    updateLoadingLog("Starting avatar load for: " .. username, nil, nil)
+    task.wait(0.05)
+    
+    updateLoadingLog("Fetching user ID...", 1, 6)
     local success, userId = getUserId(username)
     if not success then
         return false, "Username tidak ditemukan"
     end
     
+    updateLoadingLog("User ID found: " .. userId, 2, 6)
+    task.wait(0.05)
+    
     if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
         return false, "Character tidak ada!"
     end
     
-    -- Get Avatar Description (with cache)
+    updateLoadingLog("Loading avatar description...", 3, 6)
     local success2, humanoidDesc = getAvatarDesc(userId)
     if not success2 then
         return false, "Gagal load avatar"
     end
     
-    -- Save tools
+    updateLoadingLog("Saving current tools...", 4, 6)
     local savedTools = {}
     local equippedTool = nil
     
@@ -414,7 +616,7 @@ local function loadAvatar(username)
         end
     end
     
-    -- Remove old avatar parts
+    updateLoadingLog("Removing old avatar parts...", 5, 6)
     pcall(function()
         for _, accessory in pairs(lp.Character:GetChildren()) do
             if accessory:IsA("Accessory") then
@@ -429,9 +631,9 @@ local function loadAvatar(username)
         end
     end)
     
-    wait(0.1)
+    task.wait(0.1)
     
-    -- Apply avatar
+    updateLoadingLog("Applying new avatar...", 6, 6)
     local success3 = pcall(function()
         lp.Character.Humanoid:ApplyDescriptionClientServer(humanoidDesc)
     end)
@@ -440,12 +642,11 @@ local function loadAvatar(username)
         for _, tool in pairs(savedTools) do
             tool.Parent = lp.Backpack
         end
-        return false, "Gagal apply"
+        return false, "Gagal apply avatar"
     end
     
-    wait(0.3)
+    task.wait(0.3)
     
-    -- Restore tools
     for _, tool in pairs(savedTools) do
         if tool and tool:IsA("Tool") then
             tool.Parent = lp.Backpack
@@ -453,17 +654,19 @@ local function loadAvatar(username)
     end
     
     if equippedTool then
-        wait(0.1)
+        task.wait(0.1)
         local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
         if toolInBackpack then
             lp.Character.Humanoid:EquipTool(toolInBackpack)
         end
     end
     
+    local removed = removeDuplicateTools()
+    updateLoadingLog("Avatar applied! Cleaned " .. removed .. " dupes", nil, nil)
+    
     return true, username
 end
 
--- Update Preset UI
 local function updatePresetUI(presetButtons)
     for i = 1, 5 do
         local btn = presetButtons[i]
@@ -486,7 +689,6 @@ local function updatePresetUI(presetButtons)
     end
 end
 
--- Animation
 local function animateUI(frame, isOpening)
     if UIState.isAnimating then return end
     UIState.isAnimating = true
@@ -498,8 +700,8 @@ local function animateUI(frame, isOpening)
         
         local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
         local tween = TweenService:Create(frame, tweenInfo, {
-            Size = UDim2.new(0, 420, 0, 280),
-            Position = UDim2.new(0.5, -210, 0.5, -140)
+            Size = UDim2.new(0, 450, 0, 380),
+            Position = UDim2.new(0.5, -225, 0.5, -190)
         })
         tween:Play()
         tween.Completed:Wait()
@@ -534,12 +736,10 @@ local function toggleUI(mainFrame, toggleButton)
     end
 end
 
--- Main Initialization
 loadPresets()
 
-local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons = createUI()
+local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton = createUI()
 
--- Toggle Button Events (hanya mobile)
 if ToggleButton and isMobile then
     ToggleButton.MouseButton1Click:Connect(function()
         toggleUI(MainFrame, ToggleButton)
@@ -560,17 +760,23 @@ if ToggleButton and isMobile then
     end)
 end
 
--- Close Button (PC only)
 if not isMobile then
     local CloseButton = MainFrame:FindFirstChild("CloseButton")
     if CloseButton then
         CloseButton.MouseButton1Click:Connect(function()
             toggleUI(MainFrame, ToggleButton)
         end)
+        
+        CloseButton.MouseEnter:Connect(function()
+            CloseButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        end)
+        
+        CloseButton.MouseLeave:Connect(function()
+            CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        end)
     end
 end
 
--- Submit Handler
 local function handleSubmit()
     local username = UsernameInput.Text:gsub("^%s*(.-)%s*$", "%1")
     
@@ -580,7 +786,7 @@ local function handleSubmit()
         return
     end
     
-    StatusText.Text = "⏳ Applying..."
+    StatusText.Text = "⏳ Processing..."
     StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
     
     task.wait(0.1)
@@ -611,7 +817,6 @@ UsernameInput.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- Button Hover Effects
 SubmitButton.MouseEnter:Connect(function()
     SubmitButton.BackgroundColor3 = Color3.fromRGB(120, 170, 255)
 end)
@@ -620,9 +825,34 @@ SubmitButton.MouseLeave:Connect(function()
     SubmitButton.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
 end)
 
--- Preset Button Logic
+ResetButton.MouseButton1Click:Connect(function()
+    StatusText.Text = "⏳ Resetting..."
+    StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+    
+    task.wait(0.1)
+    
+    local success, result = resetToDefault()
+    
+    if success then
+        UsernameInput.Text = ""
+        UsernameInput.PlaceholderText = "Enter username..."
+        StatusText.Text = "✅ " .. result
+        StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+    else
+        StatusText.Text = "❌ " .. result
+        StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+ResetButton.MouseEnter:Connect(function()
+    ResetButton.BackgroundColor3 = Color3.fromRGB(255, 120, 120)
+end)
+
+ResetButton.MouseLeave:Connect(function()
+    ResetButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+end)
+
 for i, btn in ipairs(presetButtons) do
-    -- Left Click: Load
     btn.MouseButton1Click:Connect(function()
         if presets[i] then
             StatusText.Text = "⏳ Loading Preset " .. i .. "..."
@@ -646,7 +876,6 @@ for i, btn in ipairs(presetButtons) do
         end
     end)
     
-    -- Right Click: Save
     btn.MouseButton2Click:Connect(function()
         if lastAppliedUsername then
             presets[i] = lastAppliedUsername
@@ -661,7 +890,6 @@ for i, btn in ipairs(presetButtons) do
         end
     end)
     
-    -- Hover
     btn.MouseEnter:Connect(function()
         local stroke = btn:FindFirstChild("UIStroke")
         if stroke then
@@ -679,7 +907,6 @@ end
 
 updatePresetUI(presetButtons)
 
--- Auto Reapply on Respawn
 lp.CharacterAdded:Connect(function(char)
     if lastAppliedUsername then
         char:WaitForChild("Humanoid")
@@ -697,7 +924,6 @@ lp.CharacterAdded:Connect(function(char)
     end
 end)
 
--- F1 Keyboard Shortcut
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.F1 then
@@ -705,4 +931,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("hi how are you?")
+task.spawn(function()
+    showNotification("✅ AVATAR CHANGER LOADED\nPress F1 to toggle UI", Color3.fromRGB(100, 255, 150), 3)
+end)
