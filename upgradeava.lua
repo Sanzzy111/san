@@ -17,6 +17,51 @@ local userIdCache = {}
 local avatarDescCache = {}
 local loadingSteps = {}
 
+-- Fungsi untuk membuat UI bisa di-drag
+local function makeDraggable(frame, dragHandle)
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        local newPosition = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+        frame.Position = newPosition
+    end
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
 local function showNotification(text, color, duration)
     local ScreenGui = lp.PlayerGui:FindFirstChild("NotificationGui") or Instance.new("ScreenGui")
     ScreenGui.Name = "NotificationGui"
@@ -207,6 +252,14 @@ local function createUI()
     Gradient.Rotation = 45
     Gradient.Parent = MainFrame
     
+    -- Header untuk drag (bisa di-drag)
+    local DragHeader = Instance.new("Frame")
+    DragHeader.Name = "DragHeader"
+    DragHeader.Size = UDim2.new(1, 0, 0, 55)
+    DragHeader.Position = UDim2.new(0, 0, 0, 0)
+    DragHeader.BackgroundTransparency = 1
+    DragHeader.Parent = MainFrame
+    
     if not isMobile then
         local CloseButton = Instance.new("TextButton")
         CloseButton.Name = "CloseButton"
@@ -241,7 +294,7 @@ local function createUI()
     SubTitle.Size = UDim2.new(1, -40, 0, 15)
     SubTitle.Position = UDim2.new(0, 20, 0, 35)
     SubTitle.BackgroundTransparency = 1
-    SubTitle.Text = "Tools Protected • Auto Save"
+    SubTitle.Text = "Tools Protected • Draggable UI"
     SubTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
     SubTitle.TextSize = 11
     SubTitle.Font = Enum.Font.Gotham
@@ -458,6 +511,12 @@ local function createUI()
     StatusText.Font = Enum.Font.GothamBold
     StatusText.TextXAlignment = Enum.TextXAlignment.Center
     StatusText.Parent = StatusBar
+    
+    -- Aktifkan drag untuk MainFrame dan ToggleButton
+    makeDraggable(MainFrame, DragHeader)
+    if ToggleButton then
+        makeDraggable(ToggleButton, ToggleButton)
+    end
     
     return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton
 end
