@@ -83,13 +83,8 @@ local function makeResizable(frame, resizeHandle, minWidth, minHeight, maxWidth,
         
         frame.Size = UDim2.new(0, newWidth, 0, newHeight)
         
-        -- Update position agar anchor point tetap di tengah
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset,
-            startPos.Y.Scale,
-            startPos.Y.Offset
-        )
+        -- Selalu center frame setelah resize
+        frame.Position = UDim2.new(0.5, -newWidth/2, 0.5, -newHeight/2)
     end
 
     resizeHandle.InputBegan:Connect(function(input)
@@ -282,8 +277,8 @@ local function createUI()
     end
     
     -- Ukuran default yang lebih kecil untuk mobile
-    local defaultWidth = isMobile and 350 or 450
-    local defaultHeight = isMobile and 320 or 380
+    local defaultWidth = isMobile and 320 or 450
+    local defaultHeight = isMobile and 280 or 380
     
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
@@ -851,6 +846,12 @@ local function updatePresetUI(presetButtons)
     end
 end
 
+local function centerFrame(frame)
+    -- Selalu posisikan frame di tengah layar
+    local frameSize = frame.Size
+    frame.Position = UDim2.new(0.5, -frameSize.X.Offset/2, 0.5, -frameSize.Y.Offset/2)
+end
+
 local function animateUI(frame, isOpening)
     if UIState.isAnimating then return end
     UIState.isAnimating = true
@@ -886,6 +887,11 @@ local function toggleUI(mainFrame, toggleButton)
     if UIState.isAnimating then return end
     UIState.isOpen = not UIState.isOpen
     
+    -- Pastikan frame di tengah sebelum animasi
+    if UIState.isOpen then
+        centerFrame(mainFrame)
+    end
+    
     animateUI(mainFrame, UIState.isOpen)
     
     if toggleButton and isMobile then
@@ -902,6 +908,12 @@ end
 loadPresets()
 
 local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton = createUI()
+
+-- Pastikan MainFrame selalu di tengah saat pertama kali dibuka
+task.spawn(function()
+    task.wait(0.5)
+    centerFrame(MainFrame)
+end)
 
 if ToggleButton and isMobile then
     ToggleButton.MouseButton1Click:Connect(function()
