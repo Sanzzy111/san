@@ -62,6 +62,64 @@ local function makeDraggable(frame, dragHandle)
     end)
 end
 
+-- Fungsi untuk membuat UI bisa di-resize
+local function makeResizable(frame, resizeHandle, minWidth, minHeight, maxWidth, maxHeight)
+    local resizing = false
+    local resizeInput
+    local resizeStart
+    local startSize
+    local startPos
+
+    minWidth = minWidth or 300
+    minHeight = minHeight or 250
+    maxWidth = maxWidth or 800
+    maxHeight = maxHeight or 700
+
+    local function update(input)
+        local delta = input.Position - resizeStart
+        
+        local newWidth = math.clamp(startSize.X.Offset + delta.X, minWidth, maxWidth)
+        local newHeight = math.clamp(startSize.Y.Offset + delta.Y, minHeight, maxHeight)
+        
+        frame.Size = UDim2.new(0, newWidth, 0, newHeight)
+        
+        -- Update position agar anchor point tetap di tengah
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset,
+            startPos.Y.Scale,
+            startPos.Y.Offset
+        )
+    end
+
+    resizeHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            resizing = true
+            resizeStart = input.Position
+            startSize = frame.Size
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    resizing = false
+                end
+            end)
+        end
+    end)
+
+    resizeHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            resizeInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == resizeInput and resizing then
+            update(input)
+        end
+    end)
+end
+
 local function showNotification(text, color, duration)
     local ScreenGui = lp.PlayerGui:FindFirstChild("NotificationGui") or Instance.new("ScreenGui")
     ScreenGui.Name = "NotificationGui"
@@ -223,16 +281,21 @@ local function createUI()
         ToggleButton.Parent = ScreenGui
     end
     
+    -- Ukuran default yang lebih kecil untuk mobile
+    local defaultWidth = isMobile and 350 or 450
+    local defaultHeight = isMobile and 320 or 380
+    
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 450, 0, 380)
-    MainFrame.Position = UDim2.new(0.5, -225, 0.5, -190)
+    MainFrame.Size = UDim2.new(0, defaultWidth, 0, defaultHeight)
+    MainFrame.Position = UDim2.new(0.5, -defaultWidth/2, 0.5, -defaultHeight/2)
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
     MainFrame.BackgroundTransparency = 0.1
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = false
+    MainFrame.ClipsDescendants = false
     
     local MainCorner = Instance.new("UICorner")
     MainCorner.CornerRadius = UDim.new(0, 16)
@@ -251,6 +314,30 @@ local function createUI()
     }
     Gradient.Rotation = 45
     Gradient.Parent = MainFrame
+    
+    -- Resize Handle (sudut kanan bawah)
+    local ResizeHandle = Instance.new("Frame")
+    ResizeHandle.Name = "ResizeHandle"
+    ResizeHandle.Size = UDim2.new(0, 30, 0, 30)
+    ResizeHandle.Position = UDim2.new(1, -30, 1, -30)
+    ResizeHandle.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+    ResizeHandle.BackgroundTransparency = 0.7
+    ResizeHandle.BorderSizePixel = 0
+    ResizeHandle.ZIndex = 5
+    ResizeHandle.Parent = MainFrame
+    
+    local ResizeCorner = Instance.new("UICorner")
+    ResizeCorner.CornerRadius = UDim.new(0, 8)
+    ResizeCorner.Parent = ResizeHandle
+    
+    local ResizeIcon = Instance.new("TextLabel")
+    ResizeIcon.Size = UDim2.new(1, 0, 1, 0)
+    ResizeIcon.BackgroundTransparency = 1
+    ResizeIcon.Text = "⇲"
+    ResizeIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ResizeIcon.TextSize = 18
+    ResizeIcon.Font = Enum.Font.GothamBold
+    ResizeIcon.Parent = ResizeHandle
     
     -- Header untuk drag (bisa di-drag)
     local DragHeader = Instance.new("Frame")
@@ -285,7 +372,7 @@ local function createUI()
     TitleText.BackgroundTransparency = 1
     TitleText.Text = "✨ AVATAR CHANGER"
     TitleText.TextColor3 = Color3.fromRGB(150, 200, 255)
-    TitleText.TextSize = 20
+    TitleText.TextSize = isMobile and 18 or 20
     TitleText.Font = Enum.Font.GothamBold
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     TitleText.Parent = MainFrame
@@ -294,20 +381,33 @@ local function createUI()
     SubTitle.Size = UDim2.new(1, -40, 0, 15)
     SubTitle.Position = UDim2.new(0, 20, 0, 35)
     SubTitle.BackgroundTransparency = 1
-    SubTitle.Text = "Tools Protected • Draggable UI"
+    SubTitle.Text = "Drag Header • Resize Corner"
     SubTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
-    SubTitle.TextSize = 11
+    SubTitle.TextSize = isMobile and 9 or 11
     SubTitle.Font = Enum.Font.Gotham
     SubTitle.TextXAlignment = Enum.TextXAlignment.Left
     SubTitle.Parent = MainFrame
     
+    -- Container untuk konten dengan UIScale
+    local ContentContainer = Instance.new("Frame")
+    ContentContainer.Name = "ContentContainer"
+    ContentContainer.Size = UDim2.new(1, 0, 1, -55)
+    ContentContainer.Position = UDim2.new(0, 0, 0, 55)
+    ContentContainer.BackgroundTransparency = 1
+    ContentContainer.ClipsDescendants = true
+    ContentContainer.Parent = MainFrame
+    
+    local UIScale = Instance.new("UIScale")
+    UIScale.Scale = 1
+    UIScale.Parent = ContentContainer
+    
     local InputContainer = Instance.new("Frame")
     InputContainer.Size = UDim2.new(1, -40, 0, 45)
-    InputContainer.Position = UDim2.new(0, 20, 0, 60)
+    InputContainer.Position = UDim2.new(0, 20, 0, 5)
     InputContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     InputContainer.BackgroundTransparency = 0.3
     InputContainer.BorderSizePixel = 0
-    InputContainer.Parent = MainFrame
+    InputContainer.Parent = ContentContainer
     
     local InputCorner = Instance.new("UICorner")
     InputCorner.CornerRadius = UDim.new(0, 10)
@@ -346,11 +446,11 @@ local function createUI()
     
     local PresetContainer = Instance.new("Frame")
     PresetContainer.Size = UDim2.new(1, -40, 0, 120)
-    PresetContainer.Position = UDim2.new(0, 20, 0, 115)
+    PresetContainer.Position = UDim2.new(0, 20, 0, 60)
     PresetContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
     PresetContainer.BackgroundTransparency = 0.4
     PresetContainer.BorderSizePixel = 0
-    PresetContainer.Parent = MainFrame
+    PresetContainer.Parent = ContentContainer
     
     local PresetCorner = Instance.new("UICorner")
     PresetCorner.CornerRadius = UDim.new(0, 12)
@@ -428,11 +528,11 @@ local function createUI()
     local LoadingLogFrame = Instance.new("Frame")
     LoadingLogFrame.Name = "LoadingLogFrame"
     LoadingLogFrame.Size = UDim2.new(1, -40, 0, 60)
-    LoadingLogFrame.Position = UDim2.new(0, 20, 0, 245)
+    LoadingLogFrame.Position = UDim2.new(0, 20, 0, 190)
     LoadingLogFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     LoadingLogFrame.BackgroundTransparency = 0.4
     LoadingLogFrame.BorderSizePixel = 0
-    LoadingLogFrame.Parent = MainFrame
+    LoadingLogFrame.Parent = ContentContainer
     
     local LogCorner = Instance.new("UICorner")
     LogCorner.CornerRadius = UDim.new(0, 10)
@@ -468,7 +568,7 @@ local function createUI()
     local ResetButton = Instance.new("TextButton")
     ResetButton.Name = "ResetButton"
     ResetButton.Size = UDim2.new(1, -40, 0, 40)
-    ResetButton.Position = UDim2.new(0, 20, 0, 315)
+    ResetButton.Position = UDim2.new(0, 20, 0, 260)
     ResetButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
     ResetButton.BackgroundTransparency = 0.2
     ResetButton.BorderSizePixel = 0
@@ -476,7 +576,7 @@ local function createUI()
     ResetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     ResetButton.TextSize = 13
     ResetButton.Font = Enum.Font.GothamBold
-    ResetButton.Parent = MainFrame
+    ResetButton.Parent = ContentContainer
     
     local ResetCorner = Instance.new("UICorner")
     ResetCorner.CornerRadius = UDim.new(0, 10)
@@ -494,7 +594,7 @@ local function createUI()
     StatusBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     StatusBar.BackgroundTransparency = 0.4
     StatusBar.BorderSizePixel = 0
-    StatusBar.Parent = MainFrame
+    StatusBar.Parent = ContentContainer
     
     local StatusCorner = Instance.new("UICorner")
     StatusCorner.CornerRadius = UDim.new(0, 10)
@@ -517,6 +617,9 @@ local function createUI()
     if ToggleButton then
         makeDraggable(ToggleButton, ToggleButton)
     end
+    
+    -- Aktifkan resize untuk MainFrame
+    makeResizable(MainFrame, ResizeHandle, 300, 250, 800, 700)
     
     return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton
 end
@@ -754,13 +857,14 @@ local function animateUI(frame, isOpening)
     
     if isOpening then
         frame.Visible = true
+        local currentSize = frame.Size
         frame.Size = UDim2.new(0, 0, 0, 0)
         frame.Position = UDim2.new(0.5, 0, 0.5, 0)
         
         local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
         local tween = TweenService:Create(frame, tweenInfo, {
-            Size = UDim2.new(0, 450, 0, 380),
-            Position = UDim2.new(0.5, -225, 0.5, -190)
+            Size = currentSize,
+            Position = UDim2.new(0.5, -currentSize.X.Offset/2, 0.5, -currentSize.Y.Offset/2)
         })
         tween:Play()
         tween.Completed:Wait()
@@ -991,5 +1095,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 task.spawn(function()
-    showNotification("✅ AVATAR CHANGER LOADED\nPress F1 to toggle UI", Color3.fromRGB(100, 255, 150), 3)
+    local notifText = "✅ AVATAR CHANGER LOADED\n"
+    if isMobile then
+        notifText = notifText .. "Tap icon to open • Drag to move • Resize corner"
+    else
+        notifText = notifText .. "Press F1 to toggle • Drag header • Resize corner"
+    end
+    showNotification(notifText, Color3.fromRGB(100, 255, 150), 4)
 end)
