@@ -1,0 +1,1224 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local lp = Players.LocalPlayer
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local UIState = {
+    isOpen = false,
+    isAnimating = false
+}
+
+local lastAppliedUsername = nil
+local presets = {}
+local PRESET_FILE = "avatar_presets_snapshot.json"
+local userIdCache = {}
+local loadingSteps = {}
+
+-- Fungsi untuk membuat UI bisa di-drag
+local function makeDraggable(frame, dragHandle)
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        local newPosition = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+        frame.Position = newPosition
+    end
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+-- Fungsi untuk membuat UI bisa di-resize
+local function makeResizable(frame, resizeHandle, minWidth, minHeight, maxWidth, maxHeight)
+    local resizing = false
+    local resizeInput
+    local resizeStart
+    local startSize
+    local startPos
+
+    minWidth = minWidth or 300
+    minHeight = minHeight or 250
+    maxWidth = maxWidth or 800
+    maxHeight = maxHeight or 700
+
+    local function update(input)
+        local delta = input.Position - resizeStart
+        
+        local newWidth = math.clamp(startSize.X.Offset + delta.X, minWidth, maxWidth)
+        local newHeight = math.clamp(startSize.Y.Offset + delta.Y, minHeight, maxHeight)
+        
+        frame.Size = UDim2.new(0, newWidth, 0, newHeight)
+        frame.Position = UDim2.new(0.5, -newWidth/2, 0.5, -newHeight/2)
+    end
+
+    resizeHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            resizing = true
+            resizeStart = input.Position
+            startSize = frame.Size
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    resizing = false
+                end
+            end)
+        end
+    end)
+
+    resizeHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            resizeInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == resizeInput and resizing then
+            update(input)
+        end
+    end)
+end
+
+local function showNotification(text, color, duration)
+    local ScreenGui = lp.PlayerGui:FindFirstChild("NotificationGui") or Instance.new("ScreenGui")
+    ScreenGui.Name = "NotificationGui"
+    ScreenGui.Parent = lp.PlayerGui
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local Notif = Instance.new("Frame")
+    Notif.Size = UDim2.new(0, 300, 0, 60)
+    Notif.Position = UDim2.new(1, -320, 1, 20)
+    Notif.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Notif.BackgroundTransparency = 0.1
+    Notif.BorderSizePixel = 0
+    Notif.Parent = ScreenGui
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = Notif
+    
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = color
+    Stroke.Thickness = 2
+    Stroke.Parent = Notif
+    
+    local Text = Instance.new("TextLabel")
+    Text.Size = UDim2.new(1, -20, 1, -10)
+    Text.Position = UDim2.new(0, 10, 0, 5)
+    Text.BackgroundTransparency = 1
+    Text.Text = text
+    Text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Text.TextSize = 13
+    Text.Font = Enum.Font.GothamBold
+    Text.TextWrapped = true
+    Text.Parent = Notif
+    
+    local slideIn = TweenService:Create(Notif, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -320, 1, -80)
+    })
+    slideIn:Play()
+    
+    task.wait(duration or 3)
+    
+    local slideOut = TweenService:Create(Notif, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Position = UDim2.new(1, -320, 1, 20)
+    })
+    slideOut:Play()
+    slideOut.Completed:Wait()
+    Notif:Destroy()
+end
+
+-- FUNGSI BARU: Capture FULL avatar snapshot
+local function captureAvatarSnapshot(humanoidDesc)
+    local snapshot = {
+        -- Accessories
+        HatAccessory = humanoidDesc.HatAccessory,
+        HairAccessory = humanoidDesc.HairAccessory,
+        FaceAccessory = humanoidDesc.FaceAccessory,
+        NeckAccessory = humanoidDesc.NeckAccessory,
+        ShoulderAccessory = humanoidDesc.ShoulderAccessory,
+        FrontAccessory = humanoidDesc.FrontAccessory,
+        BackAccessory = humanoidDesc.BackAccessory,
+        WaistAccessory = humanoidDesc.WaistAccessory,
+        
+        -- Clothing
+        Shirt = humanoidDesc.Shirt,
+        Pants = humanoidDesc.Pants,
+        GraphicTShirt = humanoidDesc.GraphicTShirt,
+        
+        -- Body Parts
+        Head = humanoidDesc.Head,
+        Torso = humanoidDesc.Torso,
+        LeftArm = humanoidDesc.LeftArm,
+        RightArm = humanoidDesc.RightArm,
+        LeftLeg = humanoidDesc.LeftLeg,
+        RightLeg = humanoidDesc.RightLeg,
+        
+        -- Face
+        Face = humanoidDesc.Face,
+        
+        -- Body Colors
+        HeadColor = humanoidDesc.HeadColor,
+        TorsoColor = humanoidDesc.TorsoColor,
+        LeftArmColor = humanoidDesc.LeftArmColor,
+        RightArmColor = humanoidDesc.RightArmColor,
+        LeftLegColor = humanoidDesc.LeftLegColor,
+        RightLegColor = humanoidDesc.RightLegColor,
+        
+        -- Body Scales
+        DepthScale = humanoidDesc.DepthScale,
+        HeadScale = humanoidDesc.HeadScale,
+        HeightScale = humanoidDesc.HeightScale,
+        WidthScale = humanoidDesc.WidthScale,
+        BodyTypeScale = humanoidDesc.BodyTypeScale,
+        ProportionScale = humanoidDesc.ProportionScale,
+        
+        -- Animation
+        ClimbAnimation = humanoidDesc.ClimbAnimation,
+        FallAnimation = humanoidDesc.FallAnimation,
+        IdleAnimation = humanoidDesc.IdleAnimation,
+        JumpAnimation = humanoidDesc.JumpAnimation,
+        RunAnimation = humanoidDesc.RunAnimation,
+        SwimAnimation = humanoidDesc.SwimAnimation,
+        WalkAnimation = humanoidDesc.WalkAnimation,
+        
+        -- Emotes (jika ada)
+        MoodAnimation = humanoidDesc.MoodAnimation,
+    }
+    
+    return snapshot
+end
+
+-- FUNGSI BARU: Apply snapshot ke character
+local function applyAvatarSnapshot(snapshot)
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character not found!"
+    end
+    
+    local humanoid = lp.Character.Humanoid
+    local newDesc = Instance.new("HumanoidDescription")
+    
+    -- Apply semua data dari snapshot
+    for property, value in pairs(snapshot) do
+        pcall(function()
+            newDesc[property] = value
+        end)
+    end
+    
+    -- Apply ke character
+    local success = pcall(function()
+        humanoid:ApplyDescriptionClientServer(newDesc)
+    end)
+    
+    return success
+end
+
+local function loadPresets()
+    if not readfile or not isfile then return end
+    
+    if isfile(PRESET_FILE) then
+        local success, data = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(readfile(PRESET_FILE))
+        end)
+        
+        if success and data then
+            presets = data
+        end
+    end
+end
+
+local function savePresets()
+    if not writefile then return end
+    
+    pcall(function()
+        local json = game:GetService("HttpService"):JSONEncode(presets)
+        writefile(PRESET_FILE, json)
+    end)
+end
+
+local function getUserId(username)
+    username = string.lower(username)
+    
+    if userIdCache[username] then
+        return true, userIdCache[username]
+    end
+    
+    local success, userId = pcall(function()
+        return Players:GetUserIdFromNameAsync(username)
+    end)
+    
+    if success and userId then
+        userIdCache[username] = userId
+        return true, userId
+    end
+    
+    return false, nil
+end
+
+local function updateLoadingLog(logText, step, total)
+    if loadingSteps.textLabel then
+        local progress = ""
+        if step and total then
+            progress = string.format(" [%d/%d]", step, total)
+        end
+        loadingSteps.textLabel.Text = logText .. progress
+    end
+end
+
+local function createToggleButton()
+    if not isMobile then return nil end
+    
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Name = "ToggleButton"
+    ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+    ToggleButton.Position = UDim2.new(0, 15, 0.5, -25)
+    ToggleButton.AnchorPoint = Vector2.new(0, 0.5)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    ToggleButton.BackgroundTransparency = 0.3
+    ToggleButton.BorderSizePixel = 0
+    ToggleButton.Text = "👤"
+    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.TextSize = 28
+    ToggleButton.Font = Enum.Font.GothamBold
+    ToggleButton.ZIndex = 10
+    
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0.5, 0)
+    ToggleCorner.Parent = ToggleButton
+    
+    local ToggleStroke = Instance.new("UIStroke")
+    ToggleStroke.Color = Color3.fromRGB(100, 180, 255)
+    ToggleStroke.Thickness = 2
+    ToggleStroke.Transparency = 0.5
+    ToggleStroke.Parent = ToggleButton
+    
+    return ToggleButton
+end
+
+local function createUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "ModernAvatarChanger"
+    ScreenGui.Parent = lp.PlayerGui
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local ToggleButton = createToggleButton()
+    if ToggleButton then
+        ToggleButton.Parent = ScreenGui
+    end
+    
+    local defaultWidth = isMobile and 320 or 450
+    local defaultHeight = isMobile and 280 or 380
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, defaultWidth, 0, defaultHeight)
+    MainFrame.Position = UDim2.new(0.5, -defaultWidth/2, 0.5, -defaultHeight/2)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    MainFrame.BackgroundTransparency = 0.1
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Parent = ScreenGui
+    MainFrame.Visible = false
+    MainFrame.ClipsDescendants = false
+    
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 16)
+    MainCorner.Parent = MainFrame
+    
+    local MainStroke = Instance.new("UIStroke")
+    MainStroke.Color = Color3.fromRGB(100, 150, 255)
+    MainStroke.Thickness = 1.5
+    MainStroke.Transparency = 0.6
+    MainStroke.Parent = MainFrame
+    
+    local Gradient = Instance.new("UIGradient")
+    Gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 25))
+    }
+    Gradient.Rotation = 45
+    Gradient.Parent = MainFrame
+    
+    local ResizeHandle = Instance.new("Frame")
+    ResizeHandle.Name = "ResizeHandle"
+    ResizeHandle.Size = UDim2.new(0, 30, 0, 30)
+    ResizeHandle.Position = UDim2.new(1, -30, 1, -30)
+    ResizeHandle.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+    ResizeHandle.BackgroundTransparency = 0.7
+    ResizeHandle.BorderSizePixel = 0
+    ResizeHandle.ZIndex = 5
+    ResizeHandle.Parent = MainFrame
+    
+    local ResizeCorner = Instance.new("UICorner")
+    ResizeCorner.CornerRadius = UDim.new(0, 8)
+    ResizeCorner.Parent = ResizeHandle
+    
+    local ResizeIcon = Instance.new("TextLabel")
+    ResizeIcon.Size = UDim2.new(1, 0, 1, 0)
+    ResizeIcon.BackgroundTransparency = 1
+    ResizeIcon.Text = "⇲"
+    ResizeIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ResizeIcon.TextSize = 18
+    ResizeIcon.Font = Enum.Font.GothamBold
+    ResizeIcon.Parent = ResizeHandle
+    
+    local DragHeader = Instance.new("Frame")
+    DragHeader.Name = "DragHeader"
+    DragHeader.Size = UDim2.new(1, 0, 0, 55)
+    DragHeader.Position = UDim2.new(0, 0, 0, 0)
+    DragHeader.BackgroundTransparency = 1
+    DragHeader.Parent = MainFrame
+    
+    if not isMobile then
+        local CloseButton = Instance.new("TextButton")
+        CloseButton.Name = "CloseButton"
+        CloseButton.Size = UDim2.new(0, 30, 0, 30)
+        CloseButton.Position = UDim2.new(1, -35, 0, 5)
+        CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        CloseButton.BackgroundTransparency = 0.2
+        CloseButton.BorderSizePixel = 0
+        CloseButton.Text = "✕"
+        CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        CloseButton.TextSize = 18
+        CloseButton.Font = Enum.Font.GothamBold
+        CloseButton.Parent = MainFrame
+        
+        local CloseCorner = Instance.new("UICorner")
+        CloseCorner.CornerRadius = UDim.new(0.5, 0)
+        CloseCorner.Parent = CloseButton
+    end
+    
+    local TitleText = Instance.new("TextLabel")
+    TitleText.Size = UDim2.new(1, -40, 0, 35)
+    TitleText.Position = UDim2.new(0, 20, 0, 10)
+    TitleText.BackgroundTransparency = 1
+    TitleText.Text = "✨ AVATAR SNAPSHOT"
+    TitleText.TextColor3 = Color3.fromRGB(150, 200, 255)
+    TitleText.TextSize = isMobile and 18 or 20
+    TitleText.Font = Enum.Font.GothamBold
+    TitleText.TextXAlignment = Enum.TextXAlignment.Left
+    TitleText.Parent = MainFrame
+    
+    local SubTitle = Instance.new("TextLabel")
+    SubTitle.Size = UDim2.new(1, -40, 0, 15)
+    SubTitle.Position = UDim2.new(0, 20, 0, 35)
+    SubTitle.BackgroundTransparency = 1
+    SubTitle.Text = "Save FULL Avatar Snapshot"
+    SubTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
+    SubTitle.TextSize = isMobile and 9 or 11
+    SubTitle.Font = Enum.Font.Gotham
+    SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SubTitle.Parent = MainFrame
+    
+    local ContentContainer = Instance.new("Frame")
+    ContentContainer.Name = "ContentContainer"
+    ContentContainer.Size = UDim2.new(1, 0, 1, -55)
+    ContentContainer.Position = UDim2.new(0, 0, 0, 55)
+    ContentContainer.BackgroundTransparency = 1
+    ContentContainer.ClipsDescendants = true
+    ContentContainer.Parent = MainFrame
+    
+    local UIScale = Instance.new("UIScale")
+    UIScale.Scale = 1
+    UIScale.Parent = ContentContainer
+    
+    local InputContainer = Instance.new("Frame")
+    InputContainer.Size = UDim2.new(1, -40, 0, 45)
+    InputContainer.Position = UDim2.new(0, 20, 0, 5)
+    InputContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    InputContainer.BackgroundTransparency = 0.3
+    InputContainer.BorderSizePixel = 0
+    InputContainer.Parent = ContentContainer
+    
+    local InputCorner = Instance.new("UICorner")
+    InputCorner.CornerRadius = UDim.new(0, 10)
+    InputCorner.Parent = InputContainer
+    
+    local UsernameInput = Instance.new("TextBox")
+    UsernameInput.Name = "UsernameInput"
+    UsernameInput.Size = UDim2.new(1, -120, 1, -10)
+    UsernameInput.Position = UDim2.new(0, 15, 0, 5)
+    UsernameInput.BackgroundTransparency = 1
+    UsernameInput.Text = ""
+    UsernameInput.PlaceholderText = "Enter username..."
+    UsernameInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+    UsernameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UsernameInput.TextSize = 14
+    UsernameInput.Font = Enum.Font.Gotham
+    UsernameInput.TextXAlignment = Enum.TextXAlignment.Left
+    UsernameInput.ClearTextOnFocus = false
+    UsernameInput.Parent = InputContainer
+    
+    local SubmitButton = Instance.new("TextButton")
+    SubmitButton.Name = "SubmitButton"
+    SubmitButton.Size = UDim2.new(0, 95, 1, -10)
+    SubmitButton.Position = UDim2.new(1, -105, 0, 5)
+    SubmitButton.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+    SubmitButton.BorderSizePixel = 0
+    SubmitButton.Text = "COPY"
+    SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SubmitButton.TextSize = 13
+    SubmitButton.Font = Enum.Font.GothamBold
+    SubmitButton.Parent = InputContainer
+    
+    local SubmitCorner = Instance.new("UICorner")
+    SubmitCorner.CornerRadius = UDim.new(0, 8)
+    SubmitCorner.Parent = SubmitButton
+    
+    local PresetContainer = Instance.new("Frame")
+    PresetContainer.Size = UDim2.new(1, -40, 0, 120)
+    PresetContainer.Position = UDim2.new(0, 20, 0, 60)
+    PresetContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    PresetContainer.BackgroundTransparency = 0.4
+    PresetContainer.BorderSizePixel = 0
+    PresetContainer.Parent = ContentContainer
+    
+    local PresetCorner = Instance.new("UICorner")
+    PresetCorner.CornerRadius = UDim.new(0, 12)
+    PresetCorner.Parent = PresetContainer
+    
+    local PresetTitle = Instance.new("TextLabel")
+    PresetTitle.Size = UDim2.new(1, -20, 0, 25)
+    PresetTitle.Position = UDim2.new(0, 10, 0, 5)
+    PresetTitle.BackgroundTransparency = 1
+    PresetTitle.Text = "📸 SAVED SNAPSHOTS"
+    PresetTitle.TextColor3 = Color3.fromRGB(255, 215, 100)
+    PresetTitle.TextSize = 13
+    PresetTitle.Font = Enum.Font.GothamBold
+    PresetTitle.TextXAlignment = Enum.TextXAlignment.Left
+    PresetTitle.Parent = PresetContainer
+    
+    local PresetHint = Instance.new("TextLabel")
+    PresetHint.Size = UDim2.new(1, -20, 0, 12)
+    PresetHint.Position = UDim2.new(0, 10, 0, 28)
+    PresetHint.BackgroundTransparency = 1
+    PresetHint.Text = "Left Click: Load • Right Click: Save Current"
+    PresetHint.TextColor3 = Color3.fromRGB(130, 130, 150)
+    PresetHint.TextSize = 10
+    PresetHint.Font = Enum.Font.Gotham
+    PresetHint.TextXAlignment = Enum.TextXAlignment.Left
+    PresetHint.Parent = PresetContainer
+    
+    local presetButtons = {}
+    for i = 1, 5 do
+        local btn = Instance.new("TextButton")
+        btn.Name = "Preset" .. i
+        btn.Size = UDim2.new(0.18, 0, 0, 50)
+        btn.Position = UDim2.new((i-1) * 0.2 + 0.01, 0, 0, 45)
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+        btn.BackgroundTransparency = 0.2
+        btn.BorderSizePixel = 0
+        btn.Text = ""
+        btn.Parent = PresetContainer
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = btn
+        
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(80, 80, 100)
+        stroke.Thickness = 1
+        stroke.Transparency = 0.5
+        stroke.Parent = btn
+        
+        local number = Instance.new("TextLabel")
+        number.Size = UDim2.new(1, 0, 0, 20)
+        number.Position = UDim2.new(0, 0, 0, 5)
+        number.BackgroundTransparency = 1
+        number.Text = tostring(i)
+        number.TextColor3 = Color3.fromRGB(200, 200, 220)
+        number.TextSize = 16
+        number.Font = Enum.Font.GothamBold
+        number.Parent = btn
+        
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Size = UDim2.new(1, -4, 0, 20)
+        label.Position = UDim2.new(0, 2, 1, -25)
+        label.BackgroundTransparency = 1
+        label.Text = "Empty"
+        label.TextColor3 = Color3.fromRGB(130, 130, 150)
+        label.TextSize = 9
+        label.Font = Enum.Font.Gotham
+        label.TextTruncate = Enum.TextTruncate.AtEnd
+        label.Parent = btn
+        
+        presetButtons[i] = btn
+    end
+    
+    local LoadingLogFrame = Instance.new("Frame")
+    LoadingLogFrame.Name = "LoadingLogFrame"
+    LoadingLogFrame.Size = UDim2.new(1, -40, 0, 60)
+    LoadingLogFrame.Position = UDim2.new(0, 20, 0, 190)
+    LoadingLogFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    LoadingLogFrame.BackgroundTransparency = 0.4
+    LoadingLogFrame.BorderSizePixel = 0
+    LoadingLogFrame.Parent = ContentContainer
+    
+    local LogCorner = Instance.new("UICorner")
+    LogCorner.CornerRadius = UDim.new(0, 10)
+    LogCorner.Parent = LoadingLogFrame
+    
+    local LogTitle = Instance.new("TextLabel")
+    LogTitle.Size = UDim2.new(1, -10, 0, 15)
+    LogTitle.Position = UDim2.new(0, 5, 0, 3)
+    LogTitle.BackgroundTransparency = 1
+    LogTitle.Text = "📊 LOADING LOG"
+    LogTitle.TextColor3 = Color3.fromRGB(255, 200, 100)
+    LogTitle.TextSize = 11
+    LogTitle.Font = Enum.Font.GothamBold
+    LogTitle.TextXAlignment = Enum.TextXAlignment.Left
+    LogTitle.Parent = LoadingLogFrame
+    
+    local LogText = Instance.new("TextLabel")
+    LogText.Name = "LogText"
+    LogText.Size = UDim2.new(1, -10, 1, -20)
+    LogText.Position = UDim2.new(0, 5, 0, 18)
+    LogText.BackgroundTransparency = 1
+    LogText.Text = "Idle..."
+    LogText.TextColor3 = Color3.fromRGB(180, 180, 200)
+    LogText.TextSize = 10
+    LogText.Font = Enum.Font.Gotham
+    LogText.TextXAlignment = Enum.TextXAlignment.Left
+    LogText.TextYAlignment = Enum.TextYAlignment.Top
+    LogText.TextWrapped = true
+    LogText.Parent = LoadingLogFrame
+    
+    loadingSteps.textLabel = LogText
+    
+    local ResetButton = Instance.new("TextButton")
+    ResetButton.Name = "ResetButton"
+    ResetButton.Size = UDim2.new(1, -40, 0, 40)
+    ResetButton.Position = UDim2.new(0, 20, 0, 260)
+    ResetButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+    ResetButton.BackgroundTransparency = 0.2
+    ResetButton.BorderSizePixel = 0
+    ResetButton.Text = "🔄 RESET TO DEFAULT"
+    ResetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ResetButton.TextSize = 13
+    ResetButton.Font = Enum.Font.GothamBold
+    ResetButton.Parent = ContentContainer
+    
+    local ResetCorner = Instance.new("UICorner")
+    ResetCorner.CornerRadius = UDim.new(0, 10)
+    ResetCorner.Parent = ResetButton
+    
+    local ResetStroke = Instance.new("UIStroke")
+    ResetStroke.Color = Color3.fromRGB(255, 120, 120)
+    ResetStroke.Thickness = 1.5
+    ResetStroke.Transparency = 0.5
+    ResetStroke.Parent = ResetButton
+    
+    local StatusBar = Instance.new("Frame")
+    StatusBar.Size = UDim2.new(1, -40, 0, 35)
+    StatusBar.Position = UDim2.new(0, 20, 1, -45)
+    StatusBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    StatusBar.BackgroundTransparency = 0.4
+    StatusBar.BorderSizePixel = 0
+    StatusBar.Parent = ContentContainer
+    
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 10)
+    StatusCorner.Parent = StatusBar
+    
+    local StatusText = Instance.new("TextLabel")
+    StatusText.Name = "StatusText"
+    StatusText.Size = UDim2.new(1, -20, 1, 0)
+    StatusText.Position = UDim2.new(0, 10, 0, 0)
+    StatusText.BackgroundTransparency = 1
+    StatusText.Text = "✨ Ready"
+    StatusText.TextColor3 = Color3.fromRGB(150, 200, 255)
+    StatusText.TextSize = 12
+    StatusText.Font = Enum.Font.GothamBold
+    StatusText.TextXAlignment = Enum.TextXAlignment.Center
+    StatusText.Parent = StatusBar
+    
+    makeDraggable(MainFrame, DragHeader)
+    if ToggleButton then
+        makeDraggable(ToggleButton, ToggleButton)
+    end
+    
+    makeResizable(MainFrame, ResizeHandle, 300, 250, 800, 700)
+    
+    return ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton
+end
+
+local function removeDuplicateTools()
+    local toolNames = {}
+    local toRemove = {}
+    
+    for _, tool in pairs(lp.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            if toolNames[tool.Name] then
+                table.insert(toRemove, tool)
+            else
+                toolNames[tool.Name] = true
+            end
+        end
+    end
+    
+    if lp.Character then
+        for _, tool in pairs(lp.Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                if toolNames[tool.Name] then
+                    table.insert(toRemove, tool)
+                else
+                    toolNames[tool.Name] = true
+                end
+            end
+        end
+    end
+    
+    for _, tool in pairs(toRemove) do
+        tool:Destroy()
+    end
+    
+    return #toRemove
+end
+
+local function resetToDefault()
+    updateLoadingLog("Resetting to default avatar...", nil, nil)
+    
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character not found!"
+    end
+    
+    updateLoadingLog("Getting original avatar data...", 1, 4)
+    task.wait(0.1)
+    
+    local success, originalDesc = pcall(function()
+        return Players:GetHumanoidDescriptionFromUserId(lp.UserId)
+    end)
+    
+    if not success then
+        return false, "Failed to get original avatar"
+    end
+    
+    updateLoadingLog("Saving current tools...", 2, 4)
+    local savedTools = {}
+    for _, item in pairs(lp.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+            item.Parent = nil
+        end
+    end
+    for _, item in pairs(lp.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+        end
+    end
+    
+    updateLoadingLog("Removing current avatar parts...", 3, 4)
+    pcall(function()
+        for _, accessory in pairs(lp.Character:GetChildren()) do
+            if accessory:IsA("Accessory") then
+                accessory:Destroy()
+            end
+        end
+        for _, clothing in pairs(lp.Character:GetChildren()) do
+            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
+                clothing:Destroy()
+            end
+        end
+    end)
+    
+    task.wait(0.1)
+    
+    updateLoadingLog("Applying default avatar...", 4, 4)
+    local success2 = pcall(function()
+        lp.Character.Humanoid:ApplyDescriptionClientServer(originalDesc)
+    end)
+    
+    if not success2 then
+        return false, "Failed to apply default"
+    end
+    
+    task.wait(0.3)
+    
+    for _, tool in pairs(savedTools) do
+        if tool and tool:IsA("Tool") then
+            tool.Parent = lp.Backpack
+        end
+    end
+    
+    local removed = removeDuplicateTools()
+    
+    lastAppliedUsername = nil
+    userIdCache = {}
+    
+    updateLoadingLog("Reset complete! Removed " .. removed .. " duplicate tools", nil, nil)
+    
+    return true, "Default avatar restored"
+end
+
+-- FUNGSI UTAMA: Load dan snapshot avatar
+local function loadAvatarAndSnapshot(username)
+    if not username or username == "" then
+        return false, "Username kosong!", nil
+    end
+    
+    updateLoadingLog("Starting avatar snapshot for: " .. username, nil, nil)
+    task.wait(0.05)
+    
+    updateLoadingLog("Fetching user ID...", 1, 7)
+    local success, userId = getUserId(username)
+    if not success then
+        return false, "Username tidak ditemukan", nil
+    end
+    
+    updateLoadingLog("User ID found: " .. userId, 2, 7)
+    task.wait(0.05)
+    
+    if not lp.Character or not lp.Character:FindFirstChild("Humanoid") then
+        return false, "Character tidak ada!", nil
+    end
+    
+    updateLoadingLog("Loading avatar description...", 3, 7)
+    local success2, humanoidDesc = pcall(function()
+        return Players:GetHumanoidDescriptionFromUserId(userId)
+    end)
+    
+    if not success2 then
+        return false, "Gagal load avatar", nil
+    end
+    
+    updateLoadingLog("📸 Capturing FULL avatar snapshot...", 4, 7)
+    local snapshot = captureAvatarSnapshot(humanoidDesc)
+    task.wait(0.1)
+    
+    updateLoadingLog("Saving current tools...", 5, 7)
+    local savedTools = {}
+    local equippedTool = nil
+    
+    for _, item in pairs(lp.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            equippedTool = item
+            table.insert(savedTools, item:Clone())
+            item.Parent = nil
+        end
+    end
+    
+    for _, item in pairs(lp.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(savedTools, item:Clone())
+        end
+    end
+    
+    updateLoadingLog("Removing old avatar parts...", 6, 7)
+    pcall(function()
+        for _, accessory in pairs(lp.Character:GetChildren()) do
+            if accessory:IsA("Accessory") then
+                accessory:Destroy()
+            end
+        end
+        
+        for _, clothing in pairs(lp.Character:GetChildren()) do
+            if clothing:IsA("Shirt") or clothing:IsA("Pants") or clothing:IsA("ShirtGraphic") then
+                clothing:Destroy()
+            end
+        end
+    end)
+    
+    task.wait(0.1)
+    
+    updateLoadingLog("Applying snapshot to character...", 7, 7)
+    local success3 = applyAvatarSnapshot(snapshot)
+    
+    if not success3 then
+        for _, tool in pairs(savedTools) do
+            tool.Parent = lp.Backpack
+        end
+        return false, "Gagal apply avatar", nil
+    end
+    
+    task.wait(0.3)
+    
+    for _, tool in pairs(savedTools) do
+        if tool and tool:IsA("Tool") then
+            tool.Parent = lp.Backpack
+        end
+    end
+    
+    if equippedTool then
+        task.wait(0.1)
+        local toolInBackpack = lp.Backpack:FindFirstChild(equippedTool.Name)
+        if toolInBackpack then
+            lp.Character.Humanoid:EquipTool(toolInBackpack)
+        end
+    end
+    
+    local removed = removeDuplicateTools()
+    updateLoadingLog("✅ Snapshot saved! Cleaned " .. removed .. " dupes", nil, nil)
+    
+    return true, username, snapshot
+end
+
+local function updatePresetUI(presetButtons)
+    for i = 1, 5 do
+        local btn = presetButtons[i]
+        local label = btn:FindFirstChild("Label")
+        local stroke = btn:FindFirstChild("UIStroke")
+        
+        if presets[i] and presets[i].snapshot then
+            btn.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+            stroke.Color = Color3.fromRGB(100, 150, 255)
+            stroke.Transparency = 0.3
+            label.Text = presets[i].username or "Saved"
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+            stroke.Color = Color3.fromRGB(80, 80, 100)
+            stroke.Transparency = 0.5
+            label.Text = "Empty"
+            label.TextColor3 = Color3.fromRGB(130, 130, 150)
+        end
+    end
+end
+
+local function centerFrame(frame)
+    local frameSize = frame.Size
+    frame.Position = UDim2.new(0.5, -frameSize.X.Offset/2, 0.5, -frameSize.Y.Offset/2)
+end
+
+local function animateUI(frame, isOpening)
+    if UIState.isAnimating then return end
+    UIState.isAnimating = true
+    
+    if isOpening then
+        frame.Visible = true
+        local currentSize = frame.Size
+        frame.Size = UDim2.new(0, 0, 0, 0)
+        frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        
+        local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(frame, tweenInfo, {
+            Size = currentSize,
+            Position = UDim2.new(0.5, -currentSize.X.Offset/2, 0.5, -currentSize.Y.Offset/2)
+        })
+        tween:Play()
+        tween.Completed:Wait()
+    else
+        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        local tween = TweenService:Create(frame, tweenInfo, {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        })
+        tween:Play()
+        tween.Completed:Wait()
+        frame.Visible = false
+    end
+    
+    UIState.isAnimating = false
+end
+
+local function toggleUI(mainFrame, toggleButton)
+    if UIState.isAnimating then return end
+    UIState.isOpen = not UIState.isOpen
+    
+    if UIState.isOpen then
+        centerFrame(mainFrame)
+    end
+    
+    animateUI(mainFrame, UIState.isOpen)
+    
+    if toggleButton and isMobile then
+        if UIState.isOpen then
+            toggleButton.Text = "✕"
+            toggleButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        else
+            toggleButton.Text = "👤"
+            toggleButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        end
+    end
+end
+
+loadPresets()
+
+local ScreenGui, MainFrame, UsernameInput, StatusText, ToggleButton, SubmitButton, presetButtons, ResetButton = createUI()
+
+task.spawn(function()
+    task.wait(0.5)
+    centerFrame(MainFrame)
+end)
+
+if ToggleButton and isMobile then
+    ToggleButton.MouseButton1Click:Connect(function()
+        toggleUI(MainFrame, ToggleButton)
+    end)
+    
+    ToggleButton.MouseEnter:Connect(function()
+        local tween = TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 55, 0, 55)
+        })
+        tween:Play()
+    end)
+    
+    ToggleButton.MouseLeave:Connect(function()
+        local tween = TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 50, 0, 50)
+        })
+        tween:Play()
+    end)
+end
+
+if not isMobile then
+    local CloseButton = MainFrame:FindFirstChild("CloseButton")
+    if CloseButton then
+        CloseButton.MouseButton1Click:Connect(function()
+            toggleUI(MainFrame, ToggleButton)
+        end)
+        
+        CloseButton.MouseEnter:Connect(function()
+            CloseButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        end)
+        
+        CloseButton.MouseLeave:Connect(function()
+            CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        end)
+    end
+end
+
+local currentSnapshot = nil
+
+local function handleSubmit()
+    local username = UsernameInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    
+    if username == "" then
+        StatusText.Text = "⚠️ Enter username first!"
+        StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
+        return
+    end
+    
+    StatusText.Text = "⏳ Processing..."
+    StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+    
+    task.wait(0.1)
+    
+    local success, result, snapshot = loadAvatarAndSnapshot(username)
+    
+    if success then
+        lastAppliedUsername = result
+        currentSnapshot = snapshot
+        UsernameInput.Text = ""
+        UsernameInput.PlaceholderText = "✓ " .. result
+        StatusText.Text = "✅ Snapshot: " .. result
+        StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+        
+        showNotification("📸 Snapshot saved!\nRight-click preset to save", Color3.fromRGB(100, 255, 150), 3)
+    else
+        StatusText.Text = "❌ " .. result
+        StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
+        
+        task.wait(2)
+        StatusText.Text = "✨ Ready"
+        StatusText.TextColor3 = Color3.fromRGB(150, 200, 255)
+    end
+end
+
+SubmitButton.MouseButton1Click:Connect(handleSubmit)
+
+UsernameInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        handleSubmit()
+    end
+end)
+
+SubmitButton.MouseEnter:Connect(function()
+    SubmitButton.BackgroundColor3 = Color3.fromRGB(120, 170, 255)
+end)
+
+SubmitButton.MouseLeave:Connect(function()
+    SubmitButton.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+end)
+
+ResetButton.MouseButton1Click:Connect(function()
+    StatusText.Text = "⏳ Resetting..."
+    StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+    
+    task.wait(0.1)
+    
+    local success, result = resetToDefault()
+    
+    if success then
+        currentSnapshot = nil
+        UsernameInput.Text = ""
+        UsernameInput.PlaceholderText = "Enter username..."
+        StatusText.Text = "✅ " .. result
+        StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+    else
+        StatusText.Text = "❌ " .. result
+        StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+ResetButton.MouseEnter:Connect(function()
+    ResetButton.BackgroundColor3 = Color3.fromRGB(255, 120, 120)
+end)
+
+ResetButton.MouseLeave:Connect(function()
+    ResetButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+end)
+
+for i, btn in ipairs(presetButtons) do
+    -- Left Click: Load Preset
+    btn.MouseButton1Click:Connect(function()
+        if presets[i] and presets[i].snapshot then
+            StatusText.Text = "⏳ Loading Preset " .. i .. "..."
+            StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+            
+            task.wait(0.1)
+            
+            updateLoadingLog("Loading preset " .. i .. "...", nil, nil)
+            
+            -- Simpan tools
+            local savedTools = {}
+            if lp.Character then
+                for _, item in pairs(lp.Character:GetChildren()) do
+                    if item:IsA("Tool") then
+                        table.insert(savedTools, item:Clone())
+                        item.Parent = nil
+                    end
+                end
+            end
+            for _, item in pairs(lp.Backpack:GetChildren()) do
+                if item:IsA("Tool") then
+                    table.insert(savedTools, item:Clone())
+                end
+            end
+            
+            -- Apply snapshot yang tersimpan
+            local success = applyAvatarSnapshot(presets[i].snapshot)
+            
+            if success then
+                task.wait(0.3)
+                
+                -- Restore tools
+                for _, tool in pairs(savedTools) do
+                    if tool and tool:IsA("Tool") then
+                        tool.Parent = lp.Backpack
+                    end
+                end
+                
+                removeDuplicateTools()
+                
+                lastAppliedUsername = presets[i].username
+                currentSnapshot = presets[i].snapshot
+                StatusText.Text = "✅ Preset " .. i .. " loaded!"
+                StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+                updateLoadingLog("Preset " .. i .. " loaded successfully!", nil, nil)
+            else
+                StatusText.Text = "❌ Failed to load"
+                StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
+            end
+        else
+            StatusText.Text = "⚠️ Preset " .. i .. " is empty"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
+        end
+    end)
+    
+    -- Right Click: Save Current Snapshot
+    btn.MouseButton2Click:Connect(function()
+        if currentSnapshot then
+            presets[i] = {
+                username = lastAppliedUsername,
+                snapshot = currentSnapshot
+            }
+            savePresets()
+            updatePresetUI(presetButtons)
+            
+            StatusText.Text = "💾 Saved to Preset " .. i
+            StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+            
+            showNotification("📸 Snapshot saved to Preset " .. i .. "!", Color3.fromRGB(100, 255, 150), 2)
+        else
+            StatusText.Text = "⚠️ Copy avatar first!"
+            StatusText.TextColor3 = Color3.fromRGB(255, 165, 0)
+        end
+    end)
+    
+    btn.MouseEnter:Connect(function()
+        local stroke = btn:FindFirstChild("UIStroke")
+        if stroke then
+            stroke.Thickness = 2
+        end
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        local stroke = btn:FindFirstChild("UIStroke")
+        if stroke then
+            stroke.Thickness = 1
+        end
+    end)
+end
+
+updatePresetUI(presetButtons)
+
+-- Auto-reapply snapshot saat respawn (bukan username!)
+lp.CharacterAdded:Connect(function(char)
+    if currentSnapshot then
+        char:WaitForChild("Humanoid")
+        task.wait(1)
+        
+        StatusText.Text = "🔄 Auto-reapplying snapshot..."
+        StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+        
+        local success = applyAvatarSnapshot(currentSnapshot)
+        
+        if success then
+            StatusText.Text = "✅ Snapshot restored"
+            StatusText.TextColor3 = Color3.fromRGB(100, 255, 150)
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F1 then
+        toggleUI(MainFrame, ToggleButton)
+    end
+end)
+
+task.spawn(function()
+    local notifText = "✅ AVATAR SNAPSHOT LOADED\n"
+    if isMobile then
+        notifText = notifText .. "Tap icon to open • Right-click to save snapshot"
+    else
+        notifText = notifText .. "Press F1 to toggle • Right-click preset to save"
+    end
+    showNotification(notifText, Color3.fromRGB(100, 255, 150), 4)
+end)
