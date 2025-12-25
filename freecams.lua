@@ -82,7 +82,7 @@ local function createGUI()
     local MovementFrame = Instance.new("Frame")
     MovementFrame.Name = "Movement"
     MovementFrame.Size = UDim2.new(0, 180, 0, 180)
-    MovementFrame.Position = UDim2.new(0, 20, 1, -200)
+    MovementFrame.Position = UDim2.new(0, 20, 1, -160)
     MovementFrame.AnchorPoint = Vector2.new(0, 1)
     MovementFrame.BackgroundTransparency = 1
     MovementFrame.Parent = ControlsFrame
@@ -117,14 +117,14 @@ local function createGUI()
     local Up = Instance.new("TextButton")
     Up.Name = "Up"
     Up.Size = UDim2.new(0, 50, 0, 50)
-    Up.Position = UDim2.new(0.5, -25, 0.35, 0)
+    Up.Position = UDim2.new(-1, -10, 0, 0)
     Up.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     Up.BorderSizePixel = 0
     Up.Text = "↑"
     Up.TextColor3 = Color3.fromRGB(255, 255, 255)
     Up.TextSize = 32
     Up.Font = Enum.Font.GothamBold
-    Up.Parent = MovementFrame
+    Up.Parent = ZoomFrame
     
     local UpCorner = Instance.new("UICorner")
     UpCorner.CornerRadius = UDim.new(0, 8)
@@ -133,14 +133,14 @@ local function createGUI()
     local Down = Instance.new("TextButton")
     Down.Name = "Down"
     Down.Size = UDim2.new(0, 50, 0, 50)
-    Down.Position = UDim2.new(0.5, -25, 0.65, 0)
+    Down.Position = UDim2.new(-1, -10, 1, -60)
     Down.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     Down.BorderSizePixel = 0
     Down.Text = "↓"
     Down.TextColor3 = Color3.fromRGB(255, 255, 255)
     Down.TextSize = 32
     Down.Font = Enum.Font.GothamBold
-    Down.Parent = MovementFrame
+    Down.Parent = ZoomFrame
     
     local DownCorner = Instance.new("UICorner")
     DownCorner.CornerRadius = UDim.new(0, 8)
