@@ -40,7 +40,7 @@ local PAN_STIFFNESS = 1.0
 local FOV_STIFFNESS = 4.0
 
 ------------------------------------------------------------------------
--- GUI Creation for Mobile (Adjusted Position & Size)
+-- GUI Creation for Mobile
 ------------------------------------------------------------------------
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -51,10 +51,8 @@ local function createGUI()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.IgnoreGuiInset = true
+    ScreenGui.ScreenInsets = Enum.ScreenInsets.None
     
-    local SafeArea = Instance.new("UISafeArea")
-    SafeArea.Parent = ScreenGui
-
     -- Toggle Button (Icon)
     local ToggleButton = Instance.new("ImageButton")
     ToggleButton.Name = "ToggleButton"
@@ -62,7 +60,7 @@ local function createGUI()
     ToggleButton.Position = UDim2.new(0, 10, 0.5, -30)
     ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     ToggleButton.BorderSizePixel = 0
-    ToggleButton.Image = "rbxassetid://3926305904"
+    ToggleButton.Image = "rbxassetid://3926305904" -- Camera icon
     ToggleButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
     ToggleButton.ScaleType = Enum.ScaleType.Fit
     ToggleButton.Parent = ScreenGui
@@ -75,15 +73,16 @@ local function createGUI()
     local ControlsFrame = Instance.new("Frame")
     ControlsFrame.Name = "ControlsFrame"
     ControlsFrame.Size = UDim2.new(1, 0, 1, 0)
+    ControlsFrame.Position = UDim2.new(0, 0, 0, 0)
     ControlsFrame.BackgroundTransparency = 1
     ControlsFrame.Visible = false
-    ControlsFrame.Parent = SafeArea -- Menggunakan Safe Area
+    ControlsFrame.Parent = ScreenGui
     
-    -- Movement Controls (Left Bottom) - DISESUAIKAN
+    -- Movement Controls (Left Bottom)
     local MovementFrame = Instance.new("Frame")
     MovementFrame.Name = "Movement"
-    MovementFrame.Size = UDim2.new(0, 230, 0, 230) -- Ukuran diperbesar
-    MovementFrame.Position = UDim2.new(0, 40, 1, -60) -- Lebih kanan & Lebih bawah
+    MovementFrame.Size = UDim2.new(0, 190, 0, 190)
+    MovementFrame.Position = UDim2.new(0, 20, 1, -100)
     MovementFrame.AnchorPoint = Vector2.new(0, 1)
     MovementFrame.BackgroundTransparency = 1
     MovementFrame.Parent = ControlsFrame
@@ -91,34 +90,34 @@ local function createGUI()
     local function createArrowButton(name, position, rotation, text)
         local btn = Instance.new("TextButton")
         btn.Name = name
-        btn.Size = UDim2.new(0, 65, 0, 65) -- Tombol arah juga sedikit diperbesar
+        btn.Size = UDim2.new(0, 50, 0, 50)
         btn.Position = position
         btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
         btn.BorderSizePixel = 0
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.TextSize = 28
+        btn.TextSize = 24
         btn.Font = Enum.Font.GothamBold
         btn.Rotation = rotation
         btn.Parent = MovementFrame
         
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 10)
+        corner.CornerRadius = UDim.new(0, 8)
         corner.Parent = btn
         
         return btn
     end
     
-    local Forward = createArrowButton("Forward", UDim2.new(0.5, -32, 0, 0), 0, "▲")
-    local Back = createArrowButton("Back", UDim2.new(0.5, -32, 1, -65), 0, "▼")
-    local Left = createArrowButton("Left", UDim2.new(0, 0, 0.5, -32), 0, "◀")
-    local Right = createArrowButton("Right", UDim2.new(1, -65, 0.5, -32), 0, "▶")        
+    local Forward = createArrowButton("Forward", UDim2.new(0.5, -25, 0, 0), 0, "▲")
+    local Back = createArrowButton("Back", UDim2.new(0.5, -25, 1, -50), 0, "▼")
+    local Left = createArrowButton("Left", UDim2.new(0, 0, 0.5, -25), 0, "◀")
+    local Right = createArrowButton("Right", UDim2.new(1, -50, 0.5, -25), 0, "▶")        
     
-    -- Zoom Controls (Right Bottom) - DISESUAIKAN
+    -- Zoom Controls (Right Bottom)
     local ZoomFrame = Instance.new("Frame")
     ZoomFrame.Name = "Zoom"
     ZoomFrame.Size = UDim2.new(0, 60, 0, 130)
-    ZoomFrame.Position = UDim2.new(1, -50, 1, -100) -- Lebih ke kiri agar masuk Safe Area
+    ZoomFrame.Position = UDim2.new(1, -20, 1, -140)
     ZoomFrame.AnchorPoint = Vector2.new(1, 1)
     ZoomFrame.BackgroundTransparency = 1
     ZoomFrame.Parent = ControlsFrame
