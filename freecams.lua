@@ -40,7 +40,7 @@ local PAN_STIFFNESS = 1.0
 local FOV_STIFFNESS = 4.0
 
 ------------------------------------------------------------------------
--- GUI Creation for Mobile
+-- GUI Creation for Mobile (Adjusted Position & Size)
 ------------------------------------------------------------------------
 
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -49,100 +49,164 @@ local function createGUI()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "FreecamMobileGUI"
     ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.IgnoreGuiInset = true
-    ScreenGui.Parent = game:GetService("CoreGui")
-
-    local SafeArea = Instance.new("Frame")
-    SafeArea.Name = "SafeArea"
-    SafeArea.Size = UDim2.new(1, 0, 1, 0)
-    SafeArea.BackgroundTransparency = 1
+    
+    local SafeArea = Instance.new("UISafeArea")
     SafeArea.Parent = ScreenGui
 
-    local Padding = Instance.new("UIPadding")
-    Padding.PaddingLeft = UDim.new(0, 24)
-    Padding.PaddingRight = UDim.new(0, 24)
-    Padding.PaddingTop = UDim.new(0, 24)
-    Padding.PaddingBottom = UDim.new(0, 24)
-    Padding.Parent = SafeArea
-
-    -- Toggle Button
+    -- Toggle Button (Icon)
     local ToggleButton = Instance.new("ImageButton")
-    ToggleButton.Size = UDim2.new(0, 56, 0, 56)
-    ToggleButton.Position = UDim2.new(0, 0, 0.5, -28)
-    ToggleButton.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    ToggleButton.Name = "ToggleButton"
+    ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+    ToggleButton.Position = UDim2.new(0, 10, 0.5, -30)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    ToggleButton.BorderSizePixel = 0
     ToggleButton.Image = "rbxassetid://3926305904"
-    ToggleButton.Parent = SafeArea
-    Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1,0)
-
-    -- Controls root
+    ToggleButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.ScaleType = Enum.ScaleType.Fit
+    ToggleButton.Parent = ScreenGui
+    
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 12)
+    ToggleCorner.Parent = ToggleButton
+    
+    -- Controls Container
     local ControlsFrame = Instance.new("Frame")
+    ControlsFrame.Name = "ControlsFrame"
     ControlsFrame.Size = UDim2.new(1, 0, 1, 0)
     ControlsFrame.BackgroundTransparency = 1
     ControlsFrame.Visible = false
-    ControlsFrame.Parent = SafeArea
-
-    ----------------------------------------------------------------
-    -- MOVEMENT (LEFT BOTTOM – CONSOLE STYLE)
-    ----------------------------------------------------------------
+    ControlsFrame.Parent = SafeArea -- Menggunakan Safe Area
+    
+    -- Movement Controls (Left Bottom) - DISESUAIKAN
     local MovementFrame = Instance.new("Frame")
     MovementFrame.Name = "Movement"
-    MovementFrame.Size = UDim2.new(0, 220, 0, 220)
-    MovementFrame.AnchorPoint = Vector2.new(0,1)
-    MovementFrame.Position = UDim2.new(0, 20, 1, -20)
+    MovementFrame.Size = UDim2.new(0, 230, 0, 230) -- Ukuran diperbesar
+    MovementFrame.Position = UDim2.new(0, 40, 1, -60) -- Lebih kanan & Lebih bawah
+    MovementFrame.AnchorPoint = Vector2.new(0, 1)
     MovementFrame.BackgroundTransparency = 1
     MovementFrame.Parent = ControlsFrame
-
-    local function moveBtn(name, pos, txt)
-        local b = Instance.new("TextButton")
-        b.Name = name
-        b.Size = UDim2.new(0, 64, 0, 64)
-        b.Position = pos
-        b.BackgroundColor3 = Color3.fromRGB(45,45,45)
-        b.Text = txt
-        b.TextColor3 = Color3.new(1,1,1)
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 28
-        b.Parent = MovementFrame
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0,12)
-        return b
+    
+    local function createArrowButton(name, position, rotation, text)
+        local btn = Instance.new("TextButton")
+        btn.Name = name
+        btn.Size = UDim2.new(0, 65, 0, 65) -- Tombol arah juga sedikit diperbesar
+        btn.Position = position
+        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        btn.BorderSizePixel = 0
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 28
+        btn.Font = Enum.Font.GothamBold
+        btn.Rotation = rotation
+        btn.Parent = MovementFrame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 10)
+        corner.Parent = btn
+        
+        return btn
     end
-
-    local Forward = moveBtn("Forward", UDim2.new(0.5,-32,0,0), "▲")
-    local Back    = moveBtn("Back",    UDim2.new(0.5,-32,1,-64), "▼")
-    local Left    = moveBtn("Left",    UDim2.new(0,0,0.5,-32), "◀")
-    local Right   = moveBtn("Right",   UDim2.new(1,-64,0.5,-32), "▶")
-
-    ----------------------------------------------------------------
-    -- ZOOM + UP/DOWN (RIGHT BOTTOM – SAFE)
-    ----------------------------------------------------------------
+    
+    local Forward = createArrowButton("Forward", UDim2.new(0.5, -32, 0, 0), 0, "▲")
+    local Back = createArrowButton("Back", UDim2.new(0.5, -32, 1, -65), 0, "▼")
+    local Left = createArrowButton("Left", UDim2.new(0, 0, 0.5, -32), 0, "◀")
+    local Right = createArrowButton("Right", UDim2.new(1, -65, 0.5, -32), 0, "▶")        
+    
+    -- Zoom Controls (Right Bottom) - DISESUAIKAN
     local ZoomFrame = Instance.new("Frame")
     ZoomFrame.Name = "Zoom"
-    ZoomFrame.Size = UDim2.new(0, 72, 0, 200)
-    ZoomFrame.AnchorPoint = Vector2.new(1,1)
-    ZoomFrame.Position = UDim2.new(1, -20, 1, -20)
+    ZoomFrame.Size = UDim2.new(0, 60, 0, 130)
+    ZoomFrame.Position = UDim2.new(1, -50, 1, -100) -- Lebih ke kiri agar masuk Safe Area
+    ZoomFrame.AnchorPoint = Vector2.new(1, 1)
     ZoomFrame.BackgroundTransparency = 1
     ZoomFrame.Parent = ControlsFrame
-
-    local function zBtn(name, y, txt)
-        local b = Instance.new("TextButton")
-        b.Name = name
-        b.Size = UDim2.new(0, 72, 0, 56)
-        b.Position = UDim2.new(0,0,0,y)
-        b.BackgroundColor3 = Color3.fromRGB(45,45,45)
-        b.Text = txt
-        b.TextColor3 = Color3.new(1,1,1)
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 30
-        b.Parent = ZoomFrame
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0,12)
-        return b
-    end
-
-    local ZoomIn  = zBtn("ZoomIn", 0, "+")
-    local Up      = zBtn("Up", 64, "↑")
-    local Down    = zBtn("Down", 128, "↓")
-    local ZoomOut = zBtn("ZoomOut", 192, "−")
-
+    
+    local ZoomIn = Instance.new("TextButton")
+    ZoomIn.Name = "ZoomIn"
+    ZoomIn.Size = UDim2.new(0, 60, 0, 60)
+    ZoomIn.Position = UDim2.new(0, 0, 0, 0)
+    ZoomIn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    ZoomIn.BorderSizePixel = 0
+    ZoomIn.Text = "+"
+    ZoomIn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ZoomIn.TextSize = 36
+    ZoomIn.Font = Enum.Font.GothamBold
+    ZoomIn.Parent = ZoomFrame
+    
+    local ZoomInCorner = Instance.new("UICorner")
+    ZoomInCorner.CornerRadius = UDim.new(0, 12)
+    ZoomInCorner.Parent = ZoomIn
+    
+    local ZoomOut = Instance.new("TextButton")
+    ZoomOut.Name = "ZoomOut"
+    ZoomOut.Size = UDim2.new(0, 60, 0, 60)
+    ZoomOut.Position = UDim2.new(0, 0, 1, -60)
+    ZoomOut.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    ZoomOut.BorderSizePixel = 0
+    ZoomOut.Text = "−"
+    ZoomOut.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ZoomOut.TextSize = 36
+    ZoomOut.Font = Enum.Font.GothamBold
+    ZoomOut.Parent = ZoomFrame
+    
+    local ZoomOutCorner = Instance.new("UICorner")
+    ZoomOutCorner.CornerRadius = UDim.new(0, 12)
+    ZoomOutCorner.Parent = ZoomOut
+    
+    -- Up/Down buttons (middle)
+    local Up = Instance.new("TextButton")
+    Up.Name = "Up"
+    Up.Size = UDim2.new(0, 50, 0, 50)
+    Up.Position = UDim2.new(-1, -10, 0, 0)
+    Up.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Up.BorderSizePixel = 0
+    Up.Text = "↑"
+    Up.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Up.TextSize = 32
+    Up.Font = Enum.Font.GothamBold
+    Up.Parent = ZoomFrame
+    
+    local UpCorner = Instance.new("UICorner")
+    UpCorner.CornerRadius = UDim.new(0, 8)
+    UpCorner.Parent = Up
+    
+    local Down = Instance.new("TextButton")
+    Down.Name = "Down"
+    Down.Size = UDim2.new(0, 50, 0, 50)
+    Down.Position = UDim2.new(-1, -10, 1, -60)
+    Down.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Down.BorderSizePixel = 0
+    Down.Text = "↓"
+    Down.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Down.TextSize = 32
+    Down.Font = Enum.Font.GothamBold
+    Down.Parent = ZoomFrame
+    
+    local DownCorner = Instance.new("UICorner")
+    DownCorner.CornerRadius = UDim.new(0, 8)
+    DownCorner.Parent = Down
+    
+    -- Hide Controls Button
+    local HideButton = Instance.new("TextButton")
+    HideButton.Name = "HideButton"
+    HideButton.Size = UDim2.new(0, 100, 0, 35)
+    HideButton.Position = UDim2.new(0.5, -50, 0, 10)
+    HideButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    HideButton.BorderSizePixel = 0
+    HideButton.Text = "Hide Controls"
+    HideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HideButton.TextSize = 14
+    HideButton.Font = Enum.Font.Gotham
+    HideButton.Parent = ControlsFrame
+    
+    local HideCorner = Instance.new("UICorner")
+    HideCorner.CornerRadius = UDim.new(0, 8)
+    HideCorner.Parent = HideButton
+    
+    ScreenGui.Parent = game:GetService("CoreGui")
+    
     return ScreenGui, ToggleButton, ControlsFrame, {
         Forward = Forward,
         Back = Back,
@@ -152,6 +216,7 @@ local function createGUI()
         Down = Down,
         ZoomIn = ZoomIn,
         ZoomOut = ZoomOut,
+        HideButton = HideButton
     }
 end
 
