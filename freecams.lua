@@ -1,5 +1,5 @@
 -- Freecam Executor Version (PC & Mobile Support)  
--- PC: Tekan LeftShift + P untuk toggle  
+-- PC: Tekan P untuk toggle  
 -- Mobile: Tekan icon untuk toggle  
 ------------------------------------------------------------------------  
   
@@ -26,7 +26,7 @@ local Camera = Workspace.CurrentCamera
   
 local TOGGLE_INPUT_PRIORITY = Enum.ContextActionPriority.Low.Value  
 local INPUT_PRIORITY = Enum.ContextActionPriority.High.Value  
-local FREECAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.P}  
+local FREECAM_TOGGLE_KEY = Enum.KeyCode.P  
   
 local NAV_GAIN = Vector3.new(1, 1, 1) * 64  
 local PAN_GAIN = Vector2.new(0.75, 1) * 8  
@@ -89,43 +89,42 @@ local function createGUI()
     MovementFrame.BackgroundTransparency = 1  
     MovementFrame.Parent = ControlsFrame
     
-local aspect = Instance.new("UIAspectRatioConstraint")
-aspect.AspectRatio = 1
-aspect.Parent = MovementFrame    
+    local aspect = Instance.new("UIAspectRatioConstraint")
+    aspect.AspectRatio = 1
+    aspect.Parent = MovementFrame    
 
-local GuiService = game:GetService("GuiService")
-local insetTL, insetBR = GuiService:GetGuiInset()
+    local insetTL, insetBR = GuiService:GetGuiInset()
 
-MovementFrame.Position = UDim2.new(
-	0, 20 + insetTL.X,
-	1, -20 - insetBR.Y
-)  
+    MovementFrame.Position = UDim2.new(
+        0, 20 + insetTL.X,
+        1, -20 - insetBR.Y
+    )  
       
     local function createArrowButton(name, position, text)
-	local btn = Instance.new("TextButton")
-	btn.Name = name
-	btn.Size = UDim2.new(0.28, 0, 0.28, 0) -- RELATIF
-	btn.Position = position
-	btn.AnchorPoint = Vector2.new(0.5, 0.5)
-	btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	btn.BorderSizePixel = 0
-	btn.Text = text
-	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.TextScaled = true
-	btn.Font = Enum.Font.GothamBold
-	btn.Parent = MovementFrame
+        local btn = Instance.new("TextButton")
+        btn.Name = name
+        btn.Size = UDim2.new(0.28, 0, 0.28, 0)
+        btn.Position = position
+        btn.AnchorPoint = Vector2.new(0.5, 0.5)
+        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        btn.BorderSizePixel = 0
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextScaled = true
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = MovementFrame
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.2, 0)
-	corner.Parent = btn
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0.2, 0)
+        corner.Parent = btn
 
-	return btn
-end
+        return btn
+    end
       
     local Forward = createArrowButton("Forward", UDim2.new(0.5, 0, 0.15, 0), "▲")
-local Back    = createArrowButton("Back",    UDim2.new(0.5, 0, 0.85, 0), "▼")
-local Left    = createArrowButton("Left",    UDim2.new(0.15, 0, 0.5, 0), "◀")
-local Right   = createArrowButton("Right",   UDim2.new(0.85, 0, 0.5, 0), "▶")
+    local Back    = createArrowButton("Back",    UDim2.new(0.5, 0, 0.85, 0), "▼")
+    local Left    = createArrowButton("Left",    UDim2.new(0.15, 0, 0.5, 0), "◀")
+    local Right   = createArrowButton("Right",   UDim2.new(0.85, 0, 0.5, 0), "▶")
       
     -- Zoom Controls (Right Bottom)  
     local ZoomFrame = Instance.new("Frame")  
@@ -691,41 +690,29 @@ if isMobile then
     end)  
 end  
   
--- PC Controls  
+-- PC Controls - Simplified toggle dengan tombol P saja
 local function ToggleFreecam()  
     if enabled then  
         StopFreecam()  
-        if isMobile and controlsFrame then  
-            controlsFrame.Visible = false  
-        end  
+        print("Freecam OFF")  
     else  
         StartFreecam()  
-        if isMobile and controlsFrame then  
-            controlsFrame.Visible = true  
-        end  
+        print("Freecam ON")  
     end  
     enabled = not enabled  
 end  
   
-local function CheckMacro(macro)  
-    for i = 1, #macro - 1 do  
-        if not UserInputService:IsKeyDown(macro[i]) then  
-            return  
-        end  
-    end  
-    ToggleFreecam()  
-end  
-  
-local function HandleActivationInput(action, state, input)  
-    if state == Enum.UserInputState.Begin then  
-        if input.KeyCode == FREECAM_MACRO_KB[#FREECAM_MACRO_KB] then  
-            CheckMacro(FREECAM_MACRO_KB)  
-        end  
-    end  
-    return Enum.ContextActionResult.Pass  
-end  
-  
--- Bind keyboard controls for PC  
+-- Bind keyboard P untuk PC (tanpa kombinasi shift)
 if not isMobile then  
-    ContextActionService:BindActionAtPriority("FreecamToggle", HandleActivationInput, false, TOGGLE_INPUT_PRIORITY, FREECAM_MACRO_KB[#FREECAM_MACRO_KB])  
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)  
+        if gameProcessed then return end  
+        
+        if input.KeyCode == FREECAM_TOGGLE_KEY then  
+            ToggleFreecam()  
+        end  
+    end)  
+    
+    print("Freecam loaded! Press P to toggle")  
+else  
+    print("Freecam loaded! Tap camera icon to toggle")  
 end
