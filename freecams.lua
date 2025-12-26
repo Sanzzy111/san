@@ -83,7 +83,7 @@ local function createGUI()
     local MovementFrame = Instance.new("Frame")  
     MovementFrame.Name = "Movement"  
     MovementFrame.Size = UDim2.new(0, 190, 0, 190)  
-    MovementFrame.Position = UDim2.new(0, 20, 1, -100)  
+    MovementFrame.Position = UDim2.new(0, 80, 1, -210)  
     MovementFrame.AnchorPoint = Vector2.new(0, 1)  
     MovementFrame.BackgroundTransparency = 1  
     MovementFrame.Parent = ControlsFrame  
@@ -118,7 +118,7 @@ local function createGUI()
     local ZoomFrame = Instance.new("Frame")  
     ZoomFrame.Name = "Zoom"  
     ZoomFrame.Size = UDim2.new(0, 60, 0, 130)  
-    ZoomFrame.Position = UDim2.new(1, -20, 1, -140)  
+    ZoomFrame.Position = UDim2.new(1, -80, 1, -140)  
     ZoomFrame.AnchorPoint = Vector2.new(1, 1)  
     ZoomFrame.BackgroundTransparency = 1  
     ZoomFrame.Parent = ControlsFrame  
