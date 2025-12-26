@@ -43,7 +43,9 @@ local FOV_STIFFNESS = 4.0
 ------------------------------------------------------------------------  
   
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled  
-  
+ 
+local GuiService = game:GetService("GuiService")
+   
 local function createGUI()  
     local ScreenGui = Instance.new("ScreenGui")  
     ScreenGui.Name = "FreecamMobileGUI"  
@@ -82,11 +84,18 @@ local function createGUI()
     -- Movement Controls (Left Bottom)  
     local MovementFrame = Instance.new("Frame")  
     MovementFrame.Name = "Movement"  
-    MovementFrame.Size = UDim2.new(0, 190, 0, 190)  
-    MovementFrame.Position = UDim2.new(0, 80, 1, -210)  
-    MovementFrame.AnchorPoint = Vector2.new(0, 1)  
+    MovementFrame.AnchorPoint = Vector2.new(0, 1)
+    MovementFrame.Size = UDim2.new(0.18, 0, 0.18,   0) -- responsif  
     MovementFrame.BackgroundTransparency = 1  
-    MovementFrame.Parent = ControlsFrame  
+    MovementFrame.Parent = ControlsFrame
+
+local GuiService = game:GetService("GuiService")
+local insetTL, insetBR = GuiService:GetGuiInset()
+
+MovementFrame.Position = UDim2.new(
+	0, 20 + insetTL.X,
+	1, -20 - insetBR.Y
+)  
       
     local function createArrowButton(name, position, rotation, text)  
         local btn = Instance.new("TextButton")  
