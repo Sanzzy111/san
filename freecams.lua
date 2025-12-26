@@ -88,6 +88,10 @@ local function createGUI()
     MovementFrame.Size = UDim2.new(0.26, 0, 0.26, 0)
     MovementFrame.BackgroundTransparency = 1  
     MovementFrame.Parent = ControlsFrame
+    
+local aspect = Instance.new("UIAspectRatioConstraint")
+aspect.AspectRatio = 1
+aspect.Parent = MovementFrame    
 
 local GuiService = game:GetService("GuiService")
 local insetTL, insetBR = GuiService:GetGuiInset()
