@@ -85,7 +85,7 @@ local function createGUI()
     local MovementFrame = Instance.new("Frame")  
     MovementFrame.Name = "Movement"  
     MovementFrame.AnchorPoint = Vector2.new(0, 1)
-    MovementFrame.Size = UDim2.new(0.18, 0, 0.18,   0) -- responsif  
+    MovementFrame.Size = UDim2.new(0.26, 0, 0.26, 0)
     MovementFrame.BackgroundTransparency = 1  
     MovementFrame.Parent = ControlsFrame
 
@@ -97,31 +97,31 @@ MovementFrame.Position = UDim2.new(
 	1, -20 - insetBR.Y
 )  
       
-    local function createArrowButton(name, position, rotation, text)  
-        local btn = Instance.new("TextButton")  
-        btn.Name = name  
-        btn.Size = UDim2.new(0, 50, 0, 50)  
-        btn.Position = position  
-        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)  
-        btn.BorderSizePixel = 0  
-        btn.Text = text  
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)  
-        btn.TextSize = 24  
-        btn.Font = Enum.Font.GothamBold  
-        btn.Rotation = rotation  
-        btn.Parent = MovementFrame  
-          
-        local corner = Instance.new("UICorner")  
-        corner.CornerRadius = UDim.new(0, 8)  
-        corner.Parent = btn  
-          
-        return btn  
-    end  
+    local function createArrowButton(name, position, text)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Size = UDim2.new(0.28, 0, 0.28, 0) -- RELATIF
+	btn.Position = position
+	btn.AnchorPoint = Vector2.new(0.5, 0.5)
+	btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	btn.BorderSizePixel = 0
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.Parent = MovementFrame
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.2, 0)
+	corner.Parent = btn
+
+	return btn
+end
       
-    local Forward = createArrowButton("Forward", UDim2.new(0.5, -25, 0, 0), 0, "▲")  
-    local Back = createArrowButton("Back", UDim2.new(0.5, -25, 1, -50), 0, "▼")  
-    local Left = createArrowButton("Left", UDim2.new(0, 0, 0.5, -25), 0, "◀")  
-    local Right = createArrowButton("Right", UDim2.new(1, -50, 0.5, -25), 0, "▶")          
+    local Forward = createArrowButton("Forward", UDim2.new(0.5, 0, 0.15, 0), "▲")
+local Back    = createArrowButton("Back",    UDim2.new(0.5, 0, 0.85, 0), "▼")
+local Left    = createArrowButton("Left",    UDim2.new(0.15, 0, 0.5, 0), "◀")
+local Right   = createArrowButton("Right",   UDim2.new(0.85, 0, 0.5, 0), "▶")
       
     -- Zoom Controls (Right Bottom)  
     local ZoomFrame = Instance.new("Frame")  
